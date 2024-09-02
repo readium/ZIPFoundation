@@ -84,6 +84,7 @@ extension Data {
         let bytesRead = fread(bytes, 1, size, file)
         let error = ferror(file)
         if error > 0 {
+            bytes.deallocate()
             throw DataError.unreadableFile
         }
         #if swift(>=4.1)
