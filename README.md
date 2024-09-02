@@ -6,8 +6,8 @@
 [![Platform](https://img.shields.io/badge/Platforms-macOS%20|%20iOS%20|%20tvOS%20|%20watchOS%20|%20visionOS%20|%20Linux-lightgrey.svg)](https://github.com/weichsel/ZIPFoundation)
 [![Twitter](https://img.shields.io/badge/twitter-@weichsel-blue.svg?style=flat)](http://twitter.com/weichsel)
 
-ZIP Foundation is a library to create, read and modify ZIP archive files.  
-It is written in Swift and based on [Apple's libcompression](https://developer.apple.com/documentation/compression) for high performance and energy efficiency.  
+ZIP Foundation is a library to create, read and modify ZIP archive files.
+It is written in Swift and based on [Apple's libcompression](https://developer.apple.com/documentation/compression) for high performance and energy efficiency.
 To learn more about the performance characteristics of the framework, you can read [this blog post](https://thomas.zoechling.me/journal/2017/07/ZIPFoundation.html).
 
 - [Features](#features)
