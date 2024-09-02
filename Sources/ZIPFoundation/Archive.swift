@@ -211,7 +211,9 @@ public final class Archive: Sequence {
     }
     #endif
 
-    deinit { fclose(self.archiveFile) }
+    deinit {
+        fclose(self.archiveFile)
+    }
 
     public func makeIterator() -> AnyIterator<Entry> {
         let totalNumberOfEntriesInCD = self.totalNumberOfEntriesInCentralDirectory
