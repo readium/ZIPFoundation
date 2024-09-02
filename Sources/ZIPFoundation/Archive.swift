@@ -306,7 +306,7 @@ public final class Archive: Sequence {
         guard let locator: ZIP64EndOfCentralDirectoryLocator = Data.readStruct(from: file, at: locatorOffset),
               let record: ZIP64EndOfCentralDirectoryRecord = Data.readStruct(from: file, at: recordOffset) else {
             return nil
-        } 
+        }
         return ZIP64EndOfCentralDirectory(record: record, locator: locator)
     }
 }
