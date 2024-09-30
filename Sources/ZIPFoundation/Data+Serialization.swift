@@ -29,7 +29,7 @@ extension Data {
     }
 
     func scanValue<T>(start: Int) -> T {
-        return self.withUnsafeBytes() {
+        return self.withUnsafeBytes {
             $0.loadUnaligned(fromByteOffset: start, as: T.self)
         }
     }
