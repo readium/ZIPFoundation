@@ -16,7 +16,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "ZIPFoundation::ZIPFoundation"
                BuildableName = "ZIPFoundation.framework"
-               BlueprintName = "ZIPFoundation"
+               BlueprintName = "ReadiumZIPFoundation"
                ReferencedContainer = "container:ZIPFoundation.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -33,7 +33,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "ZIPFoundation::ZIPFoundation"
             BuildableName = "ZIPFoundation.framework"
-            BlueprintName = "ZIPFoundation"
+            BlueprintName = "ReadiumZIPFoundation"
             ReferencedContainer = "container:ZIPFoundation.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -44,7 +44,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "ZIPFoundation::ZIPFoundationTests"
                BuildableName = "ZIPFoundationTests.xctest"
-               BlueprintName = "ZIPFoundationTests"
+               BlueprintName = "ReadiumZIPFoundationTests"
                ReferencedContainer = "container:ZIPFoundation.xcodeproj">
             </BuildableReference>
          </TestableReference>
@@ -65,7 +65,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "ZIPFoundation::ZIPFoundation"
             BuildableName = "ZIPFoundation.framework"
-            BlueprintName = "ZIPFoundation"
+            BlueprintName = "ReadiumZIPFoundation"
             ReferencedContainer = "container:ZIPFoundation.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -81,7 +81,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "ZIPFoundation::ZIPFoundation"
             BuildableName = "ZIPFoundation.framework"
-            BlueprintName = "ZIPFoundation"
+            BlueprintName = "ReadiumZIPFoundation"
             ReferencedContainer = "container:ZIPFoundation.xcodeproj">
          </BuildableReference>
       </MacroExpansion>

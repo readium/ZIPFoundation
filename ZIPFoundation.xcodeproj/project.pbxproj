@@ -40,7 +40,7 @@
 		OBJ_37 /* ZIPFoundationReadingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = OBJ_22 /* ZIPFoundationReadingTests.swift */; };
 		OBJ_38 /* ZIPFoundationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = OBJ_23 /* ZIPFoundationTests.swift */; };
 		OBJ_39 /* ZIPFoundationWritingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = OBJ_24 /* ZIPFoundationWritingTests.swift */; };
-		OBJ_41 /* ZIPFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = "ZIPFoundation::ZIPFoundation::Product" /* ZIPFoundation.framework */; };
+		OBJ_41 /* ReadiumZIPFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = "ZIPFoundation::ZIPFoundation::Product" /* ReadiumZIPFoundation.framework */; };
 		OBJ_48 /* Archive+Reading.swift in Sources */ = {isa = PBXBuildFile; fileRef = OBJ_9 /* Archive+Reading.swift */; };
 		OBJ_49 /* Archive+Writing.swift in Sources */ = {isa = PBXBuildFile; fileRef = OBJ_10 /* Archive+Writing.swift */; };
 		OBJ_50 /* Archive.swift in Sources */ = {isa = PBXBuildFile; fileRef = OBJ_11 /* Archive.swift */; };
@@ -115,8 +115,8 @@
 		OBJ_24 /* ZIPFoundationWritingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZIPFoundationWritingTests.swift; sourceTree = "<group>"; };
 		OBJ_6 /* Package.swift */ = {isa = PBXFileReference; explicitFileType = sourcecode.swift; path = Package.swift; sourceTree = "<group>"; };
 		OBJ_9 /* Archive+Reading.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Archive+Reading.swift"; sourceTree = "<group>"; };
-		"ZIPFoundation::ZIPFoundation::Product" /* ZIPFoundation.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = ZIPFoundation.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		"ZIPFoundation::ZIPFoundationTests::Product" /* ZIPFoundationTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = ZIPFoundationTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		"ZIPFoundation::ZIPFoundation::Product" /* ReadiumZIPFoundation.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = ReadiumZIPFoundation.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		"ZIPFoundation::ZIPFoundationTests::Product" /* ReadiumZIPFoundationTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = ReadiumZIPFoundationTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -124,7 +124,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 0;
 			files = (
-				OBJ_41 /* ZIPFoundation.framework in Frameworks */,
+				OBJ_41 /* ReadiumZIPFoundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -183,8 +183,8 @@
 		OBJ_25 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				"ZIPFoundation::ZIPFoundationTests::Product" /* ZIPFoundationTests.xctest */,
-				"ZIPFoundation::ZIPFoundation::Product" /* ZIPFoundation.framework */,
+				"ZIPFoundation::ZIPFoundationTests::Product" /* ReadiumZIPFoundationTests.xctest */,
+				"ZIPFoundation::ZIPFoundation::Product" /* ReadiumZIPFoundation.framework */,
 			);
 			name = Products;
 			sourceTree = BUILT_PRODUCTS_DIR;
@@ -240,9 +240,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		"ZIPFoundation::ZIPFoundation" /* ZIPFoundation */ = {
+		"ZIPFoundation::ZIPFoundation" /* ReadiumZIPFoundation */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = OBJ_44 /* Build configuration list for PBXNativeTarget "ZIPFoundation" */;
+			buildConfigurationList = OBJ_44 /* Build configuration list for PBXNativeTarget "ReadiumZIPFoundation" */;
 			buildPhases = (
 				OBJ_47 /* Sources */,
 				OBJ_55 /* Frameworks */,
@@ -252,14 +252,14 @@
 			);
 			dependencies = (
 			);
-			name = ZIPFoundation;
+			name = ReadiumZIPFoundation;
 			productName = ZIPFoundation;
-			productReference = "ZIPFoundation::ZIPFoundation::Product" /* ZIPFoundation.framework */;
+			productReference = "ZIPFoundation::ZIPFoundation::Product" /* ReadiumZIPFoundation.framework */;
 			productType = "com.apple.product-type.framework";
 		};
-		"ZIPFoundation::ZIPFoundationTests" /* ZIPFoundationTests */ = {
+		"ZIPFoundation::ZIPFoundationTests" /* ReadiumZIPFoundationTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = OBJ_29 /* Build configuration list for PBXNativeTarget "ZIPFoundationTests" */;
+			buildConfigurationList = OBJ_29 /* Build configuration list for PBXNativeTarget "ReadiumZIPFoundationTests" */;
 			buildPhases = (
 				OBJ_32 /* Sources */,
 				OBJ_40 /* Frameworks */,
@@ -270,9 +270,9 @@
 			dependencies = (
 				OBJ_42 /* PBXTargetDependency */,
 			);
-			name = ZIPFoundationTests;
+			name = ReadiumZIPFoundationTests;
 			productName = ZIPFoundationTests;
-			productReference = "ZIPFoundation::ZIPFoundationTests::Product" /* ZIPFoundationTests.xctest */;
+			productReference = "ZIPFoundation::ZIPFoundationTests::Product" /* ReadiumZIPFoundationTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
@@ -304,8 +304,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				"ZIPFoundation::ZIPFoundation" /* ZIPFoundation */,
-				"ZIPFoundation::ZIPFoundationTests" /* ZIPFoundationTests */,
+				"ZIPFoundation::ZIPFoundation" /* ReadiumZIPFoundation */,
+				"ZIPFoundation::ZIPFoundationTests" /* ReadiumZIPFoundationTests */,
 			);
 		};
 /* End PBXProject section */
@@ -385,7 +385,7 @@
 /* Begin PBXTargetDependency section */
 		OBJ_42 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = "ZIPFoundation::ZIPFoundation" /* ZIPFoundation */;
+			target = "ZIPFoundation::ZIPFoundation" /* ReadiumZIPFoundation */;
 			targetProxy = BAEFCCF91EFD201600AFB154 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -458,7 +458,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@loader_path/../Frameworks @loader_path/Frameworks";
 				OTHER_LDFLAGS = "$(inherited)";
 				OTHER_SWIFT_FLAGS = "$(inherited)";
-				TARGET_NAME = ZIPFoundationTests;
+				TARGET_NAME = ReadiumZIPFoundationTests;
 			};
 			name = Debug;
 		};
@@ -476,7 +476,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@loader_path/../Frameworks @loader_path/Frameworks";
 				OTHER_LDFLAGS = "$(inherited)";
 				OTHER_SWIFT_FLAGS = "$(inherited)";
-				TARGET_NAME = ZIPFoundationTests;
+				TARGET_NAME = ReadiumZIPFoundationTests;
 			};
 			name = Release;
 		};
@@ -551,7 +551,7 @@
 				PRODUCT_MODULE_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
-				TARGET_NAME = ZIPFoundation;
+				TARGET_NAME = ReadiumZIPFoundation;
 			};
 			name = Debug;
 		};
@@ -577,7 +577,7 @@
 				PRODUCT_MODULE_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
-				TARGET_NAME = ZIPFoundation;
+				TARGET_NAME = ReadiumZIPFoundation;
 			};
 			name = Release;
 		};
@@ -593,7 +593,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		OBJ_29 /* Build configuration list for PBXNativeTarget "ZIPFoundationTests" */ = {
+		OBJ_29 /* Build configuration list for PBXNativeTarget "ReadiumZIPFoundationTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				OBJ_30 /* Debug */,
@@ -602,7 +602,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		OBJ_44 /* Build configuration list for PBXNativeTarget "ZIPFoundation" */ = {
+		OBJ_44 /* Build configuration list for PBXNativeTarget "ReadiumZIPFoundation" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				OBJ_45 /* Debug */,
