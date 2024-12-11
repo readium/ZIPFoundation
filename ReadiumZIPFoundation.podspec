@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name = 'ReadiumZIPFoundation'
-  s.version = '0.9.19'
+  s.version = '1.0.0'
   s.license = 'MIT'
   s.summary = 'Effortless ZIP Handling in Swift'
   s.homepage = 'https://github.com/readium/ZIPFoundation'
