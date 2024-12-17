@@ -9,7 +9,7 @@
 //
 
 import XCTest
-@testable import ZIPFoundation
+@testable import ReadiumZIPFoundation
 
 enum AdditionalDataError: Error {
     case encodingError

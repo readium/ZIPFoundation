@@ -11,7 +11,7 @@
 import Foundation
 
 import XCTest
-@testable import ZIPFoundation
+@testable import ReadiumZIPFoundation
 
 #if swift(>=5.0)
 

@@ -9,7 +9,7 @@
 //
 
 import XCTest
-@testable import ZIPFoundation
+@testable import ReadiumZIPFoundation
 
 extension ZIPFoundationTests {
 

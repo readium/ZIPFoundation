@@ -8,7 +8,7 @@
 //  See https://github.com/weichsel/ZIPFoundation/blob/master/LICENSE for license information.
 //
 import XCTest
-@testable import ZIPFoundation
+@testable import ReadiumZIPFoundation
 
 extension ZIPFoundationTests {
 

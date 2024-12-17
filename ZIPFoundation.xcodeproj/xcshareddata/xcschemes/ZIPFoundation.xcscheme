@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "ZIPFoundation::ZIPFoundation"
-               BuildableName = "ZIPFoundation.framework"
+               BuildableName = "ReadiumZIPFoundation.framework"
                BlueprintName = "ReadiumZIPFoundation"
                ReferencedContainer = "container:ZIPFoundation.xcodeproj">
             </BuildableReference>
@@ -32,7 +32,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "ZIPFoundation::ZIPFoundation"
-            BuildableName = "ZIPFoundation.framework"
+            BuildableName = "ReadiumZIPFoundation.framework"
             BlueprintName = "ReadiumZIPFoundation"
             ReferencedContainer = "container:ZIPFoundation.xcodeproj">
          </BuildableReference>
@@ -43,7 +43,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "ZIPFoundation::ZIPFoundationTests"
-               BuildableName = "ZIPFoundationTests.xctest"
+               BuildableName = "ReadiumZIPFoundationTests.xctest"
                BlueprintName = "ReadiumZIPFoundationTests"
                ReferencedContainer = "container:ZIPFoundation.xcodeproj">
             </BuildableReference>
@@ -64,7 +64,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "ZIPFoundation::ZIPFoundation"
-            BuildableName = "ZIPFoundation.framework"
+            BuildableName = "ReadiumZIPFoundation.framework"
             BlueprintName = "ReadiumZIPFoundation"
             ReferencedContainer = "container:ZIPFoundation.xcodeproj">
          </BuildableReference>
@@ -80,7 +80,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "ZIPFoundation::ZIPFoundation"
-            BuildableName = "ZIPFoundation.framework"
+            BuildableName = "ReadiumZIPFoundation.framework"
             BlueprintName = "ReadiumZIPFoundation"
             ReferencedContainer = "container:ZIPFoundation.xcodeproj">
          </BuildableReference>
