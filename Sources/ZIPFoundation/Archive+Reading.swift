@@ -91,7 +91,7 @@ extension Archive {
         var checksum = CRC32(0)
         let localFileHeader = entry.localFileHeader
         guard entry.dataOffset <= .max else { throw ArchiveError.invalidLocalHeaderDataOffset }
-        fseeko(self.archiveFile, off_t(entry.dataOffset), SEEK_SET)
+        try dataSource.seek(to: entry.dataOffset)
         progress?.totalUnitCount = self.totalUnitCountForReading(entry)
         switch entry.type {
         case .file:
@@ -110,7 +110,7 @@ extension Archive {
         case .symlink:
             let localFileHeader = entry.localFileHeader
             let size = Int(localFileHeader.compressedSize)
-            let data = try Data.readChunk(of: size, from: self.archiveFile)
+            let data = try dataSource.read(length: size)
             checksum = data.crc32(checksum: 0)
             try consumer(data)
             progress?.completedUnitCount = self.totalUnitCountForReading(entry)
@@ -167,14 +167,14 @@ extension Archive {
         bufferSize: Int,
         consumer: Consumer
     ) throws {
-        fseeko(archiveFile, off_t(entry.dataOffset + range.lowerBound), SEEK_SET)
+        try dataSource.seek(to: entry.dataOffset + range.lowerBound)
         
         _ = try Data.consumePart(
             of: Int64(range.count),
             chunkSize: bufferSize,
             skipCRC32: true,
             provider: { pos, chunkSize -> Data in
-                try Data.readChunk(of: chunkSize, from: self.archiveFile)
+                try dataSource.read(length: chunkSize)
             },
             consumer: consumer
         )
@@ -191,7 +191,7 @@ extension Archive {
         var bytesRead: UInt64 = 0
         
         do {
-            fseeko(archiveFile, off_t(entry.dataOffset), SEEK_SET)
+            try dataSource.seek(to: entry.dataOffset)
             
             _ = try readCompressed(
                 entry: entry,

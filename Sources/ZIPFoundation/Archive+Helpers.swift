@@ -20,7 +20,7 @@ extension Archive {
         guard size <= .max else { throw ArchiveError.invalidEntrySize }
         return try Data.consumePart(of: Int64(size), chunkSize: bufferSize, skipCRC32: skipCRC32,
                                     provider: { (_, chunkSize) -> Data in
-                                        return try Data.readChunk(of: chunkSize, from: self.archiveFile)
+                                        return try self.dataSource.read(length: chunkSize)
                                     }, consumer: { (data) in
                                         if progress?.isCancelled == true { throw ArchiveError.cancelledOperation }
                                         try consumer(data)
@@ -34,7 +34,7 @@ extension Archive {
         guard size <= .max else { throw ArchiveError.invalidEntrySize }
         return try Data.decompress(size: Int64(size), bufferSize: bufferSize, skipCRC32: skipCRC32,
                                    provider: { (_, chunkSize) -> Data in
-                                    return try Data.readChunk(of: chunkSize, from: self.archiveFile)
+                                    return try self.dataSource.read(length: chunkSize)
                                    }, consumer: { (data) in
                                     if progress?.isCancelled == true { throw ArchiveError.cancelledOperation }
                                     try consumer(data)
@@ -110,7 +110,7 @@ extension Archive {
                                               fileNameLength: UInt16(fileNameData.count),
                                               extraFieldLength: extraFieldLength, fileNameData: fileNameData,
                                               extraFieldData: zip64ExtendedInformation?.data ?? Data())
-        _ = try Data.write(chunk: localFileHeader.data, to: self.archiveFile)
+        try writableDataSource.write(localFileHeader.data)
         return localFileHeader
     }
 
@@ -151,7 +151,7 @@ extension Archive {
                                                          relativeOffset: relativeOffsetOfCD,
                                                          extraField: (extraFieldLength,
                                                                       zip64ExtendedInformation?.data ?? Data()))
-        _ = try Data.write(chunk: centralDirectory.data, to: self.archiveFile)
+        try writableDataSource.write(centralDirectory.data)
         return centralDirectory
     }
 
@@ -202,7 +202,7 @@ extension Archive {
                                              numberOfEntriesInCentralDirectory: numberOfTotalEntriesForEOCD,
                                              updatedSizeOfCentralDirectory: sizeOfCDForEOCD,
                                              startOfCentralDirectory: offsetOfCDForEOCD)
-        _ = try Data.write(chunk: record.data, to: self.archiveFile)
+        try writableDataSource.write(record.data)
         return (record, zip64EOCD)
     }
 
@@ -216,7 +216,8 @@ extension Archive {
             let readSize = (size - position) >= bufferSize ? bufferSize : Int(size - position)
             let entryChunk = try provider(position, readSize)
             checksum = entryChunk.crc32(checksum: checksum)
-            sizeWritten += Int64(try Data.write(chunk: entryChunk, to: self.archiveFile))
+            try writableDataSource.write(entryChunk)
+            sizeWritten += Int64(entryChunk.count)
             position += Int64(bufferSize)
             progress?.completedUnitCount = sizeWritten
         }
@@ -226,7 +227,10 @@ extension Archive {
     func writeCompressed(size: Int64, bufferSize: Int, progress: Progress? = nil,
                          provider: Provider) throws -> (sizeWritten: Int64, checksum: CRC32) {
         var sizeWritten: Int64 = 0
-        let consumer: Consumer = { data in sizeWritten += Int64(try Data.write(chunk: data, to: self.archiveFile)) }
+        let consumer: Consumer = { data in
+            try self.writableDataSource.write(data)
+            sizeWritten += Int64(data.count)
+        }
         let checksum = try Data.compress(size: size, bufferSize: bufferSize,
                                          provider: { (position, size) -> Data in
                                             if progress?.isCancelled == true { throw ArchiveError.cancelledOperation }
@@ -241,8 +245,8 @@ extension Archive {
         // The reported size of a symlink is the number of characters in the path it points to.
         let linkData = try provider(0, size)
         let checksum = linkData.crc32(checksum: 0)
-        let sizeWritten = try Data.write(chunk: linkData, to: self.archiveFile)
-        return (sizeWritten, checksum)
+        try writableDataSource.write(linkData)
+        return (linkData.count, checksum)
     }
 
     func writeZIP64EOCD(totalNumberOfEntries: UInt64,
@@ -274,7 +278,7 @@ extension Archive {
         let updatedLocator = ZIP64EndOfCentralDirectoryLocator(locator: zip64EOCD.locator,
                                                                offsetOfZIP64EOCDRecord: offsetOfEndOfCentralDirectory)
         zip64EOCD = ZIP64EndOfCentralDirectory(record: updatedRecord, locator: updatedLocator)
-        _ = try Data.write(chunk: zip64EOCD.data, to: self.archiveFile)
+        try writableDataSource.write(zip64EOCD.data)
         return zip64EOCD
     }
 }
