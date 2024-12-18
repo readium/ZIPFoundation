@@ -117,20 +117,20 @@ extension Archive {
                          modificationDate: Date = Date(), permissions: UInt16? = nil,
                          compressionMethod: CompressionMethod = .none, bufferSize: Int = defaultWriteChunkSize,
                          progress: Progress? = nil, provider: Provider) throws {
-        guard self.accessMode != .read else { throw ArchiveError.unwritableArchive }
+        guard self.accessMode != .read, let dataSource = dataSource as? WritableDataSource else { throw ArchiveError.unwritableArchive }
         // Directories and symlinks cannot be compressed
         let compressionMethod = type == .file ? compressionMethod : .none
         progress?.totalUnitCount = type == .directory ? defaultDirectoryUnitCount : uncompressedSize
         let (eocdRecord, zip64EOCD) = (self.endOfCentralDirectoryRecord, self.zip64EndOfCentralDirectory)
         guard self.offsetToStartOfCentralDirectory <= .max else { throw ArchiveError.invalidCentralDirectoryOffset }
-        var startOfCD = Int64(self.offsetToStartOfCentralDirectory)
-        fseeko(self.archiveFile, off_t(startOfCD), SEEK_SET)
+        var startOfCD = self.offsetToStartOfCentralDirectory
+        try dataSource.seek(to: startOfCD)
         let existingSize = self.sizeOfCentralDirectory
-        let existingData = try Data.readChunk(of: Int(existingSize), from: self.archiveFile)
-        fseeko(self.archiveFile, off_t(startOfCD), SEEK_SET)
-        let fileHeaderStart = Int64(ftello(self.archiveFile))
+        let existingData = try dataSource.read(length: Int(existingSize))
+        try dataSource.seek(to: startOfCD)
+        let fileHeaderStart = try dataSource.position()
         let modDateTime = modificationDate.fileModificationDateTime
-        defer { fflush(self.archiveFile) }
+        defer { try? dataSource.flush() }
         do {
             // Local File Header
             var localFileHeader = try self.writeLocalFileHeader(path: path, compressionMethod: compressionMethod,
@@ -140,22 +140,22 @@ extension Archive {
             let (written, checksum) = try self.writeEntry(uncompressedSize: uncompressedSize, type: type,
                                                           compressionMethod: compressionMethod, bufferSize: bufferSize,
                                                           progress: progress, provider: provider)
-            startOfCD = Int64(ftello(self.archiveFile))
+            startOfCD = try dataSource.position()
             // Write the local file header a second time. Now with compressedSize (if applicable) and a valid checksum.
-            fseeko(self.archiveFile, off_t(fileHeaderStart), SEEK_SET)
+            try dataSource.seek(to: fileHeaderStart)
             localFileHeader = try self.writeLocalFileHeader(path: path, compressionMethod: compressionMethod,
                                                             size: (UInt64(uncompressedSize), UInt64(written)),
                                                             checksum: checksum, modificationDateTime: modDateTime)
             // Central Directory
-            fseeko(self.archiveFile, off_t(startOfCD), SEEK_SET)
-            _ = try Data.writeLargeChunk(existingData, size: existingSize, bufferSize: bufferSize, to: archiveFile)
+            try dataSource.seek(to: startOfCD)
+            try dataSource.writeLargeChunk(existingData, size: existingSize, bufferSize: bufferSize)
             let permissions = permissions ?? (type == .directory ? defaultDirectoryPermissions : defaultFilePermissions)
             let externalAttributes = FileManager.externalFileAttributesForEntry(of: type, permissions: permissions)
             let centralDir = try self.writeCentralDirectoryStructure(localFileHeader: localFileHeader,
                                                                      relativeOffset: UInt64(fileHeaderStart),
                                                                      externalFileAttributes: externalAttributes)
             // End of Central Directory Record (including ZIP64 End of Central Directory Record/Locator)
-            let startOfEOCD = UInt64(ftello(self.archiveFile))
+            let startOfEOCD = try dataSource.position()
             let eocd = try self.writeEndOfCentralDirectory(centralDirectoryStructure: centralDir,
                                                            startOfCentralDirectory: UInt64(startOfCD),
                                                            startOfEndOfCentralDirectory: startOfEOCD, operation: .add)
@@ -174,7 +174,7 @@ extension Archive {
     ///   - progress: A progress object that can be used to track or cancel the remove operation.
     /// - Throws: An error if the `Entry` is malformed or the receiver is not writable.
     public func remove(_ entry: Entry, bufferSize: Int = defaultReadChunkSize, progress: Progress? = nil) throws {
-        guard self.accessMode != .read else { throw ArchiveError.unwritableArchive }
+        guard self.accessMode != .read, let dataSource = dataSource as? WritableDataSource else { throw ArchiveError.unwritableArchive }
         let (tempArchive, tempDir) = try self.makeTempArchive()
         defer { tempDir.map { try? FileManager().removeItem(at: $0) } }
         progress?.totalUnitCount = self.totalUnitCountForRemoving(entry)
@@ -184,13 +184,13 @@ extension Archive {
             let cds = currentEntry.centralDirectoryStructure
             if currentEntry != entry {
                 let entryStart = cds.effectiveRelativeOffsetOfLocalHeader
-                fseeko(self.archiveFile, off_t(entryStart), SEEK_SET)
+                try dataSource.seek(to: entryStart)
                 let provider: Provider = { (_, chunkSize) -> Data in
-                    return try Data.readChunk(of: chunkSize, from: self.archiveFile)
+                    try dataSource.read(length: chunkSize)
                 }
                 let consumer: Consumer = {
                     if progress?.isCancelled == true { throw ArchiveError.cancelledOperation }
-                    _ = try Data.write(chunk: $0, to: tempArchive.archiveFile)
+                    try tempArchive.writableDataSource.write($0)
                     progress?.completedUnitCount += Int64($0.count)
                 }
                 guard currentEntry.localSize <= .max else { throw ArchiveError.invalidLocalHeaderSize }
@@ -201,9 +201,9 @@ extension Archive {
                 centralDirectoryData.append(updatedCentralDirectory.data)
             } else { offset = currentEntry.localSize }
         }
-        let startOfCentralDirectory = UInt64(ftello(tempArchive.archiveFile))
-        _ = try Data.write(chunk: centralDirectoryData, to: tempArchive.archiveFile)
-        let startOfEndOfCentralDirectory = UInt64(ftello(tempArchive.archiveFile))
+        let startOfCentralDirectory = try tempArchive.dataSource.position()
+        try tempArchive.writableDataSource.write(centralDirectoryData)
+        let startOfEndOfCentralDirectory = try tempArchive.dataSource.position()
         tempArchive.endOfCentralDirectoryRecord = self.endOfCentralDirectoryRecord
         tempArchive.zip64EndOfCentralDirectory = self.zip64EndOfCentralDirectory
         let ecodStructure = try
@@ -213,12 +213,13 @@ extension Archive {
                                                    operation: .remove)
         (tempArchive.endOfCentralDirectoryRecord, tempArchive.zip64EndOfCentralDirectory) = ecodStructure
         (self.endOfCentralDirectoryRecord, self.zip64EndOfCentralDirectory) = ecodStructure
-        fflush(tempArchive.archiveFile)
+        try tempArchive.writableDataSource.flush()
         try self.replaceCurrentArchive(with: tempArchive)
     }
 
     func replaceCurrentArchive(with archive: Archive) throws {
-        fclose(self.archiveFile)
+        try dataSource.close()
+        
         if self.isMemoryArchive {
             #if swift(>=5.0)
             guard let data = archive.data else {
@@ -226,7 +227,7 @@ extension Archive {
             }
 
             let config = try Archive.makeBackingConfiguration(for: data, mode: .update)
-            self.archiveFile = config.file
+            self.dataSource = config.dataSource
             self.memoryFile = config.memoryFile
             self.endOfCentralDirectoryRecord = config.endOfCentralDirectoryRecord
             self.zip64EndOfCentralDirectory = config.zip64EndOfCentralDirectory
@@ -244,9 +245,7 @@ extension Archive {
             _ = try fileManager.removeItem(at: self.url)
             _ = try fileManager.moveItem(at: archive.url, to: self.url)
             #endif
-            let fileSystemRepresentation = fileManager.fileSystemRepresentation(withPath: self.url.path)
-            guard let file = fopen(fileSystemRepresentation, "rb+") else { throw ArchiveError.unreadableArchive }
-            self.archiveFile = file
+            self.dataSource = try FileDataSource(url: self.url, mode: .write)
         }
     }
 }
@@ -268,16 +267,16 @@ private extension Archive {
     func rollback(_ localFileHeaderStart: UInt64, _ existingCentralDirectory: (data: Data, size: UInt64),
                   _ bufferSize: Int, _ endOfCentralDirRecord: EndOfCentralDirectoryRecord,
                   _ zip64EndOfCentralDirectory: ZIP64EndOfCentralDirectory?) throws {
-        fflush(self.archiveFile)
-        ftruncate(fileno(self.archiveFile), off_t(localFileHeaderStart))
-        fseeko(self.archiveFile, off_t(localFileHeaderStart), SEEK_SET)
-        _ = try Data.writeLargeChunk(existingCentralDirectory.data, size: existingCentralDirectory.size,
-                                     bufferSize: bufferSize, to: archiveFile)
-        _ = try Data.write(chunk: existingCentralDirectory.data, to: self.archiveFile)
+        try writableDataSource.flush()
+        try writableDataSource.truncate(to: localFileHeaderStart)
+        try writableDataSource.seek(to: localFileHeaderStart)
+        try writableDataSource.writeLargeChunk(existingCentralDirectory.data, size: existingCentralDirectory.size,
+                                     bufferSize: bufferSize)
+        try writableDataSource.write(existingCentralDirectory.data)
         if let zip64EOCD = zip64EndOfCentralDirectory {
-            _ = try Data.write(chunk: zip64EOCD.data, to: self.archiveFile)
+            try writableDataSource.write(zip64EOCD.data)
         }
-        _ = try Data.write(chunk: endOfCentralDirRecord.data, to: self.archiveFile)
+        try writableDataSource.write(endOfCentralDirRecord.data)
     }
 
     func makeTempArchive() throws -> (Archive, URL?) {

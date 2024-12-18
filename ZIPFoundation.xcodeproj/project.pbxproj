@@ -33,6 +33,8 @@
 		BACE20B826F7CE6C003BA312 /* Archive+BackingConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BACE20B726F7CE6C003BA312 /* Archive+BackingConfiguration.swift */; };
 		BACE20BA26F7D18A003BA312 /* Archive+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = BACE20B926F7D18A003BA312 /* Archive+Helpers.swift */; };
 		BACE20BD26F7D545003BA312 /* Entry+Serialization.swift in Sources */ = {isa = PBXBuildFile; fileRef = BACE20BC26F7D545003BA312 /* Entry+Serialization.swift */; };
+		CAF35E4D2D1187060042C460 /* DataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF35E4B2D1187040042C460 /* DataSource.swift */; };
+		CAF35E502D11A4290042C460 /* FileDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF35E4E2D11A4260042C460 /* FileDataSource.swift */; };
 		OBJ_33 /* ZIPFoundationDataSerializationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = OBJ_18 /* ZIPFoundationDataSerializationTests.swift */; };
 		OBJ_34 /* ZIPFoundationEntryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = OBJ_19 /* ZIPFoundationEntryTests.swift */; };
 		OBJ_35 /* ZIPFoundationFileManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = OBJ_20 /* ZIPFoundationFileManagerTests.swift */; };
@@ -100,6 +102,8 @@
 		BACE20B726F7CE6C003BA312 /* Archive+BackingConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Archive+BackingConfiguration.swift"; sourceTree = "<group>"; };
 		BACE20B926F7D18A003BA312 /* Archive+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Archive+Helpers.swift"; sourceTree = "<group>"; };
 		BACE20BC26F7D545003BA312 /* Entry+Serialization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Entry+Serialization.swift"; sourceTree = "<group>"; };
+		CAF35E4B2D1187040042C460 /* DataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataSource.swift; sourceTree = "<group>"; };
+		CAF35E4E2D11A4260042C460 /* FileDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDataSource.swift; sourceTree = "<group>"; };
 		OBJ_10 /* Archive+Writing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Archive+Writing.swift"; sourceTree = "<group>"; };
 		OBJ_11 /* Archive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Archive.swift; sourceTree = "<group>"; };
 		OBJ_12 /* Data+Compression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Data+Compression.swift"; sourceTree = "<group>"; };
@@ -218,6 +222,8 @@
 				95B5A3D32366731B00D4D8FD /* Archive+MemoryFile.swift */,
 				BA643D7B2648131C00018273 /* Archive+Progress.swift */,
 				OBJ_9 /* Archive+Reading.swift */,
+				CAF35E4B2D1187040042C460 /* DataSource.swift */,
+				CAF35E4E2D11A4260042C460 /* FileDataSource.swift */,
 				BA0CE5072746B369004D8DD4 /* Archive+ReadingDeprecated.swift */,
 				OBJ_10 /* Archive+Writing.swift */,
 				BA0CE5032746AF0C004D8DD4 /* Archive+WritingDeprecated.swift */,
@@ -375,7 +381,9 @@
 				BA0CE5042746AF0C004D8DD4 /* Archive+WritingDeprecated.swift in Sources */,
 				OBJ_54 /* FileManager+ZIP.swift in Sources */,
 				BA643D7C2648131C00018273 /* Archive+Progress.swift in Sources */,
+				CAF35E502D11A4290042C460 /* FileDataSource.swift in Sources */,
 				BA0CE5082746B369004D8DD4 /* Archive+ReadingDeprecated.swift in Sources */,
+				CAF35E4D2D1187060042C460 /* DataSource.swift in Sources */,
 				BACE20BD26F7D545003BA312 /* Entry+Serialization.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

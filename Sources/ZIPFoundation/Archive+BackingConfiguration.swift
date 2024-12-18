@@ -13,27 +13,27 @@ import Foundation
 extension Archive {
 
     struct BackingConfiguration {
-        let file: FILEPointer
+        let dataSource: DataSource
         let endOfCentralDirectoryRecord: EndOfCentralDirectoryRecord
         let zip64EndOfCentralDirectory: ZIP64EndOfCentralDirectory?
         #if swift(>=5.0)
         let memoryFile: MemoryFile?
 
-        init(file: FILEPointer,
+        init(dataSource: DataSource,
              endOfCentralDirectoryRecord: EndOfCentralDirectoryRecord,
              zip64EndOfCentralDirectory: ZIP64EndOfCentralDirectory? = nil,
              memoryFile: MemoryFile? = nil) {
-            self.file = file
+            self.dataSource = dataSource
             self.endOfCentralDirectoryRecord = endOfCentralDirectoryRecord
             self.zip64EndOfCentralDirectory = zip64EndOfCentralDirectory
             self.memoryFile = memoryFile
         }
         #else
 
-        init(file: FILEPointer,
+        init(dataSource: DataSource,
              endOfCentralDirectoryRecord: EndOfCentralDirectoryRecord,
              zip64EndOfCentralDirectory: ZIP64EndOfCentralDirectory?) {
-            self.file = file
+            self.dataSource = dataSource
             self.endOfCentralDirectoryRecord = endOfCentralDirectoryRecord
             self.zip64EndOfCentralDirectory = zip64EndOfCentralDirectory
         }
@@ -42,19 +42,10 @@ extension Archive {
 
     static func makeBackingConfiguration(for url: URL, mode: AccessMode) throws
     -> BackingConfiguration {
-        let fileManager = FileManager()
+        let dataSource: DataSource
         switch mode {
         case .read:
-            let fileSystemRepresentation = fileManager.fileSystemRepresentation(withPath: url.path)
-            guard let archiveFile = fopen(fileSystemRepresentation, "rb") else {
-                throw POSIXError(errno, path: url.path)
-            }
-            guard let (eocdRecord, zip64EOCD) = Archive.scanForEndOfCentralDirectoryRecord(in: archiveFile) else {
-                throw ArchiveError.missingEndOfCentralDirectoryRecord
-            }
-            return BackingConfiguration(file: archiveFile,
-                                        endOfCentralDirectoryRecord: eocdRecord,
-                                        zip64EndOfCentralDirectory: zip64EOCD)
+            dataSource = try FileDataSource(url: url, mode: .read)
         case .create:
             let endOfCentralDirectoryRecord = EndOfCentralDirectoryRecord(numberOfDisk: 0, numberOfDiskStart: 0,
                                                                           totalNumberOfEntriesOnDisk: 0,
@@ -66,18 +57,19 @@ extension Archive {
             try endOfCentralDirectoryRecord.data.write(to: url, options: .withoutOverwriting)
             fallthrough
         case .update:
-            let fileSystemRepresentation = fileManager.fileSystemRepresentation(withPath: url.path)
-            guard let archiveFile = fopen(fileSystemRepresentation, "rb+") else {
-                throw POSIXError(errno, path: url.path)
-            }
-            guard let (eocdRecord, zip64EOCD) = Archive.scanForEndOfCentralDirectoryRecord(in: archiveFile) else {
-                throw ArchiveError.missingEndOfCentralDirectoryRecord
-            }
-            fseeko(archiveFile, 0, SEEK_SET)
-            return BackingConfiguration(file: archiveFile,
-                                        endOfCentralDirectoryRecord: eocdRecord,
-                                        zip64EndOfCentralDirectory: zip64EOCD)
+            dataSource = try FileDataSource(url: url, mode: .write)
         }
+        
+        guard let (eocdRecord, zip64EOCD) = try Archive.scanForEndOfCentralDirectoryRecord(in: dataSource) else {
+            throw ArchiveError.missingEndOfCentralDirectoryRecord
+        }
+        try dataSource.seek(to: 0)
+        
+        return BackingConfiguration(
+            dataSource: dataSource,
+            endOfCentralDirectoryRecord: eocdRecord,
+            zip64EndOfCentralDirectory: zip64EOCD
+        )
     }
 
     #if swift(>=5.0)
@@ -93,18 +85,10 @@ extension Archive {
         guard let archiveFile = memoryFile.open(mode: posixMode) else {
             throw ArchiveError.unreadableArchive
         }
+        
+        let dataSource = FileDataSource(file: archiveFile)
 
-        switch mode {
-        case .read:
-            guard let (eocdRecord, zip64EOCD) = Archive.scanForEndOfCentralDirectoryRecord(in: archiveFile) else {
-                throw ArchiveError.missingEndOfCentralDirectoryRecord
-            }
-
-            return BackingConfiguration(file: archiveFile,
-                                        endOfCentralDirectoryRecord: eocdRecord,
-                                        zip64EndOfCentralDirectory: zip64EOCD,
-                                        memoryFile: memoryFile)
-        case .create:
+        if mode == .create {
             let endOfCentralDirectoryRecord = EndOfCentralDirectoryRecord(numberOfDisk: 0, numberOfDiskStart: 0,
                                                                           totalNumberOfEntriesOnDisk: 0,
                                                                           totalNumberOfEntriesInCentralDirectory: 0,
@@ -112,21 +96,18 @@ extension Archive {
                                                                           offsetToStartOfCentralDirectory: 0,
                                                                           zipFileCommentLength: 0,
                                                                           zipFileCommentData: Data())
-            _ = endOfCentralDirectoryRecord.data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
-                fwrite(buffer.baseAddress, buffer.count, 1, archiveFile) // Errors handled during read
-            }
-            fallthrough
-        case .update:
-            guard let (eocdRecord, zip64EOCD) = Archive.scanForEndOfCentralDirectoryRecord(in: archiveFile) else {
-                throw ArchiveError.missingEndOfCentralDirectoryRecord
-            }
-
-            fseeko(archiveFile, 0, SEEK_SET)
-            return BackingConfiguration(file: archiveFile,
-                                        endOfCentralDirectoryRecord: eocdRecord,
-                                        zip64EndOfCentralDirectory: zip64EOCD,
-                                        memoryFile: memoryFile)
+            try dataSource.write(endOfCentralDirectoryRecord.data)
         }
+        
+        guard let (eocdRecord, zip64EOCD) = try Archive.scanForEndOfCentralDirectoryRecord(in: dataSource) else {
+            throw ArchiveError.missingEndOfCentralDirectoryRecord
+        }
+
+        try dataSource.seek(to: 0)
+        return BackingConfiguration(dataSource: dataSource,
+                                    endOfCentralDirectoryRecord: eocdRecord,
+                                    zip64EndOfCentralDirectory: zip64EOCD,
+                                    memoryFile: memoryFile)
     }
     #endif
 }
