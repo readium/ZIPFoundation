@@ -117,7 +117,7 @@ extension ZIPFoundationTests {
             return
         }
         XCTAssertNotNil(fileEntry)
-        XCTAssertCocoaError(try archive.extract(fileEntry, to: archive.url),
+        XCTAssertCocoaError(try archive.extract(fileEntry, to: archive.url!),
                             throwsErrorWithCode: .fileWriteFileExists)
         guard let linkEntry = archive["testZipItemLink"] else {
             XCTFail("Failed to obtain test asset from archive.")
@@ -130,7 +130,7 @@ extension ZIPFoundationTests {
         XCTAssertPOSIXError(try archive.extract(fileEntry, to: overlongURL),
                             throwsErrorWithCode: .ENAMETOOLONG)
         XCTAssertNotNil(linkEntry)
-        XCTAssertCocoaError(try archive.extract(linkEntry, to: archive.url),
+        XCTAssertCocoaError(try archive.extract(linkEntry, to: archive.url!),
                             throwsErrorWithCode: .fileWriteFileExists)
     }
 
@@ -271,7 +271,7 @@ extension ZIPFoundationTests {
         let fileManager = FileManager()
         let archive = self.archive(for: #function, mode: .read)
         let destinationURL = self.createDirectory(for: #function)
-        XCTAssertSwiftError(try fileManager.unzipItem(at: archive.url, to: destinationURL),
+        XCTAssertSwiftError(try fileManager.unzipItem(at: archive.url!, to: destinationURL),
                             throws: Archive.ArchiveError.invalidCRC32)
     }
 
@@ -279,7 +279,7 @@ extension ZIPFoundationTests {
         let fileManager = FileManager()
         let archive = self.archive(for: #function, mode: .read)
         let destinationURL = self.createDirectory(for: #function)
-        XCTAssertCocoaError(try fileManager.unzipItem(at: archive.url, to: destinationURL),
+        XCTAssertCocoaError(try fileManager.unzipItem(at: archive.url!, to: destinationURL),
                             throwsErrorWithCode: .fileReadInvalidFileName)
     }
 
@@ -287,7 +287,7 @@ extension ZIPFoundationTests {
         let fileManager = FileManager()
         let archive = self.archive(for: #function, mode: .read)
         let destinationURL = self.createDirectory(for: #function)
-        XCTAssertCocoaError(try fileManager.unzipItem(at: archive.url, to: destinationURL),
+        XCTAssertCocoaError(try fileManager.unzipItem(at: archive.url!, to: destinationURL),
                             throwsErrorWithCode: .fileReadInvalidFileName)
     }
 }

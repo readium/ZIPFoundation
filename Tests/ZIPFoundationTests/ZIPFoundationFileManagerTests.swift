@@ -89,7 +89,7 @@ extension ZIPFoundationTests {
         let archive = self.archive(for: #function, mode: .read)
         let destinationURL = self.createDirectory(for: #function)
         do {
-            try fileManager.unzipItem(at: archive.url, to: destinationURL)
+            try fileManager.unzipItem(at: archive.url!, to: destinationURL)
         } catch {
             XCTFail("Failed to extract item."); return
         }
@@ -108,7 +108,7 @@ extension ZIPFoundationTests {
         let archive = self.archive(for: #function, mode: .read, preferredEncoding: encoding)
         let destinationURL = self.createDirectory(for: #function)
         do {
-            try fileManager.unzipItem(at: archive.url, to: destinationURL, pathEncoding: encoding)
+            try fileManager.unzipItem(at: archive.url!, to: destinationURL, pathEncoding: encoding)
         } catch {
             XCTFail("Failed to extract item."); return
         }
@@ -146,7 +146,7 @@ extension ZIPFoundationTests {
         let fileManager = FileManager()
         let archive = self.archive(for: #function, mode: .read)
         let destinationURL = self.createDirectory(for: #function)
-        XCTAssertSwiftError(try fileManager.unzipItem(at: archive.url, to: destinationURL),
+        XCTAssertSwiftError(try fileManager.unzipItem(at: archive.url!, to: destinationURL),
                             throws: Archive.ArchiveError.uncontainedSymlink)
 
         var linkArchiveURL = ZIPFoundationTests.tempZipDirectoryURL

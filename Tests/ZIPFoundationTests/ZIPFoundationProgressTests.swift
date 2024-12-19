@@ -165,7 +165,7 @@ extension ZIPFoundationTests {
                                                             expectedValue: 1.0)
         DispatchQueue.global().async {
             do {
-                try fileManager.unzipItem(at: archive.url, to: destinationURL, progress: progress)
+                try fileManager.unzipItem(at: archive.url!, to: destinationURL, progress: progress)
             } catch {
                 XCTFail("Failed to extract item."); return
             }

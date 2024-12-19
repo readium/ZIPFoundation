@@ -130,7 +130,7 @@ public final class Archive: Sequence {
     }
 
     /// URL of an Archive's backing file.
-    public let url: URL
+    public let url: URL?
     /// Access mode for an archive file.
     public let accessMode: AccessMode
     var dataSource: DataSource
@@ -177,6 +177,16 @@ public final class Archive: Sequence {
         self.accessMode = mode
         self.pathEncoding = pathEncoding
         let config = try Archive.makeBackingConfiguration(for: url, mode: mode)
+        self.dataSource = config.dataSource
+        self.endOfCentralDirectoryRecord = config.endOfCentralDirectoryRecord
+        self.zip64EndOfCentralDirectory = config.zip64EndOfCentralDirectory
+    }
+
+    public init(url: URL?, dataSource: DataSource, pathEncoding: String.Encoding? = nil) throws {
+        self.url = url
+        self.accessMode = .read
+        self.pathEncoding = pathEncoding
+        let config = try Archive.makeBackingConfiguration(for: dataSource)
         self.dataSource = config.dataSource
         self.endOfCentralDirectoryRecord = config.endOfCentralDirectoryRecord
         self.zip64EndOfCentralDirectory = config.zip64EndOfCentralDirectory

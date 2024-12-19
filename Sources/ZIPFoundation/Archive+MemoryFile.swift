@@ -11,7 +11,7 @@
 import Foundation
 
 extension Archive {
-    var isMemoryArchive: Bool { return self.url.scheme == memoryURLScheme }
+    var isMemoryArchive: Bool { return self.url?.scheme == memoryURLScheme }
 }
 
 #if swift(>=5.0)
