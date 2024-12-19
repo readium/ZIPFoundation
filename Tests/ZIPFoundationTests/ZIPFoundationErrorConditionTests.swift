@@ -66,7 +66,7 @@ extension ZIPFoundationTests {
         do {
             var invalidLocalFHArchiveURL = ZIPFoundationTests.tempZipDirectoryURL
             invalidLocalFHArchiveURL.appendPathComponent(processInfo.globallyUniqueString)
-            var invalidLocalFHArchiveData = try Data(contentsOf: archive.url)
+            var invalidLocalFHArchiveData = try Data(contentsOf: archive.url!)
             // Construct an archive with a corrupt LocalFileHeader.
             // While the initializer is expected to work for such archives, iterator creation
             // should fail.

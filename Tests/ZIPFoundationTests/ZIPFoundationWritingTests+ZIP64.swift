@@ -31,7 +31,7 @@ extension ZIPFoundationTests {
         }
         XCTAssert(entry.checksum == data.crc32(checksum: 0))
         XCTAssert(archive.checkIntegrity())
-        let fileSystemRepresentation = FileManager.default.fileSystemRepresentation(withPath: archive.url.path)
+        let fileSystemRepresentation = FileManager.default.fileSystemRepresentation(withPath: archive.url!.path)
         guard let archiveFile = fopen(fileSystemRepresentation, "rb") else {
             XCTFail("Failed to read data of archive file."); return
         }

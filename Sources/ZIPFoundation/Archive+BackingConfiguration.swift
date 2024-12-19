@@ -39,27 +39,42 @@ extension Archive {
         }
         #endif
     }
+    
+    static func makeBackingConfiguration(for url: URL, mode: AccessMode) throws -> BackingConfiguration {
+        if url.isHTTPURL {
+            precondition(mode == .read)
+            let dataSource = try HTTPDataSource(url: url)
+            return try makeBackingConfiguration(for: dataSource)
+        }
+        
+        return try makeFileBackingConfiguration(for: url, mode: mode)
+    }
 
-    static func makeBackingConfiguration(for url: URL, mode: AccessMode) throws
-    -> BackingConfiguration {
+    static func makeFileBackingConfiguration(for url: URL, mode: AccessMode) throws -> BackingConfiguration {
         let dataSource: DataSource
         switch mode {
         case .read:
             dataSource = try FileDataSource(url: url, mode: .read)
         case .create:
-            let endOfCentralDirectoryRecord = EndOfCentralDirectoryRecord(numberOfDisk: 0, numberOfDiskStart: 0,
-                                                                          totalNumberOfEntriesOnDisk: 0,
-                                                                          totalNumberOfEntriesInCentralDirectory: 0,
-                                                                          sizeOfCentralDirectory: 0,
-                                                                          offsetToStartOfCentralDirectory: 0,
-                                                                          zipFileCommentLength: 0,
-                                                                          zipFileCommentData: Data())
+            let endOfCentralDirectoryRecord = EndOfCentralDirectoryRecord(
+                numberOfDisk: 0, numberOfDiskStart: 0,
+                totalNumberOfEntriesOnDisk: 0,
+                totalNumberOfEntriesInCentralDirectory: 0,
+                sizeOfCentralDirectory: 0,
+                offsetToStartOfCentralDirectory: 0,
+                zipFileCommentLength: 0,
+                zipFileCommentData: Data()
+            )
             try endOfCentralDirectoryRecord.data.write(to: url, options: .withoutOverwriting)
             fallthrough
         case .update:
             dataSource = try FileDataSource(url: url, mode: .write)
         }
         
+        return try makeBackingConfiguration(for: dataSource)
+    }
+    
+    static func makeBackingConfiguration(for dataSource: DataSource) throws -> BackingConfiguration {
         guard let (eocdRecord, zip64EOCD) = try Archive.scanForEndOfCentralDirectoryRecord(in: dataSource) else {
             throw ArchiveError.missingEndOfCentralDirectoryRecord
         }

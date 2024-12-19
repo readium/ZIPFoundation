@@ -74,24 +74,6 @@ final class FileDataSource : WritableDataSource {
         )
     }
     
-    func readInt() throws -> UInt32 {
-        var int: UInt32 = UInt32()
-        fread(&int, 1, MemoryLayout<UInt32>.size, file)
-        try checkNoError()
-        return int
-    }
-    
-    func readStruct<T>(at position: UInt64) throws -> T? where T : DataSerializable {
-        try seek(to: position)
-        
-        return T(
-            data: try read(length: T.size),
-            additionalDataProvider: { additionalDataSize -> Data in
-                try read(length: additionalDataSize)
-            }
-        )
-    }
-    
     func write(_ data: Data) throws {
         try data.withUnsafeBytes { rawBufferPointer in
             if let baseAddress = rawBufferPointer.baseAddress, rawBufferPointer.count > 0 {

@@ -123,7 +123,7 @@ extension ZIPFoundationTests {
         let archive = self.archive(for: testFunction, mode: .read)
         let destinationURL = self.createDirectory(for: testFunction)
         do {
-            try fileManager.unzipItem(at: archive.url, to: destinationURL)
+            try fileManager.unzipItem(at: archive.url!, to: destinationURL)
         } catch {
             throw ZIP64FileManagerTestsError.failedToUnzipItem
         }

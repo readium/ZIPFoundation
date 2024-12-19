@@ -50,6 +50,7 @@ extension Archive {
     /// - Throws: An error if the source file cannot be read or the receiver is not writable.
     public func addEntry(with path: String, fileURL: URL, compressionMethod: CompressionMethod = .none,
                          bufferSize: Int = defaultWriteChunkSize, progress: Progress? = nil) throws {
+        guard let url = self.url else { throw ArchiveError.unwritableArchive }
         let fileManager = FileManager()
         guard fileManager.itemExists(at: fileURL) else {
             throw CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: fileURL.path])
@@ -218,6 +219,8 @@ extension Archive {
     }
 
     func replaceCurrentArchive(with archive: Archive) throws {
+        guard let url = self.url, let archiveURL = archive.url else { throw ArchiveError.unwritableArchive }
+
         try dataSource.close()
         
         if self.isMemoryArchive {
@@ -236,16 +239,16 @@ extension Archive {
             let fileManager = FileManager()
             #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
             do {
-                _ = try fileManager.replaceItemAt(self.url, withItemAt: archive.url)
+                _ = try fileManager.replaceItemAt(url, withItemAt: archiveURL)
             } catch {
-                _ = try fileManager.removeItem(at: self.url)
-                _ = try fileManager.moveItem(at: archive.url, to: self.url)
+                _ = try fileManager.removeItem(at: url)
+                _ = try fileManager.moveItem(at: archiveURL, to: url)
             }
             #else
-            _ = try fileManager.removeItem(at: self.url)
-            _ = try fileManager.moveItem(at: archive.url, to: self.url)
+            _ = try fileManager.removeItem(at: url)
+            _ = try fileManager.moveItem(at: archiveURL, to: url)
             #endif
-            self.dataSource = try FileDataSource(url: self.url, mode: .write)
+            self.dataSource = try FileDataSource(url: url, mode: .write)
         }
     }
 }
