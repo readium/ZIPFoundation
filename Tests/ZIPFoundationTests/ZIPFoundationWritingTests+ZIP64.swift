@@ -14,23 +14,23 @@ import XCTest
 extension ZIPFoundationTests {
 
     /// Target fields: Uncompressed Size, Compressed Size, Offset of Central Directory and other ZIP64 format fields
-    func testCreateZIP64ArchiveWithLargeSize() {
+    func testCreateZIP64ArchiveWithLargeSize() async throws {
         self.mockIntMaxValues()
         defer { self.resetIntMaxValues() }
-        let archive = self.archive(for: #function, mode: .create)
+        let archive = await self.archive(for: #function, mode: .create)
         let size: UInt64 = 64 * 64 * 2
         let data = Data.makeRandomData(size: Int(size))
         let entryName = ProcessInfo.processInfo.globallyUniqueString
         do {
-            try archive.addFileEntry(with: entryName, size: Int(size), data: data)
+            try await archive.addFileEntry(with: entryName, size: Int(size), data: data)
         } catch {
             XCTFail("Failed to add ZIP64 format entry to archive with error : \(error)"); return
         }
-        guard let entry = archive[entryName] else {
+        guard let entry = try await archive.get(entryName) else {
             XCTFail("Failed to retrieve ZIP64 format entry from archive"); return
         }
         XCTAssert(entry.checksum == data.crc32(checksum: 0))
-        XCTAssert(archive.checkIntegrity())
+        await archive.checkIntegrity()
         let fileSystemRepresentation = FileManager.default.fileSystemRepresentation(withPath: archive.url!.path)
         guard let archiveFile = fopen(fileSystemRepresentation, "rb") else {
             XCTFail("Failed to read data of archive file."); return
@@ -144,155 +144,155 @@ extension ZIPFoundationTests {
     }
 
     /// Target fields: Relative Offset of Local Header
-    func testAddEntryToArchiveWithZIP64LFHOffset() {
+    func testAddEntryToArchiveWithZIP64LFHOffset() async throws {
         self.mockIntMaxValues()
         defer { self.resetIntMaxValues() }
-        let archive = self.archive(for: #function, mode: .update)
+        let archive = await self.archive(for: #function, mode: .update)
         let size = 64 * 64 * 2
         let data = Data.makeRandomData(size: size)
         let entryName = ProcessInfo.processInfo.globallyUniqueString
         let currentLFHOffset = archive.offsetToStartOfCentralDirectory
         do {
-            try archive.addFileEntry(with: entryName, size: size, data: data)
+            try await archive.addFileEntry(with: entryName, size: size, data: data)
         } catch {
             XCTFail("Failed to add ZIP64 format entry to archive with error : \(error)"); return
         }
-        guard let entry = archive[entryName] else {
+        guard let entry = try await archive.get(entryName) else {
             XCTFail("Failed to retrieve ZIP64 format entry from archivee"); return
         }
         XCTAssert(entry.checksum == data.crc32(checksum: 0))
-        XCTAssert(archive.checkIntegrity())
+        await archive.checkIntegrity()
         XCTAssertEqual(entry.centralDirectoryStructure.relativeOffsetOfLocalHeader, UInt32.max)
         XCTAssertEqual(entry.centralDirectoryStructure.extraFieldData.scanValue(start: 20), currentLFHOffset)
     }
 
-    func testAddDirectoryToArchiveWithZIP64LFHOffset() {
+    func testAddDirectoryToArchiveWithZIP64LFHOffset() async throws {
         self.mockIntMaxValues()
         defer { self.resetIntMaxValues() }
-        let archive = self.archive(for: #function, mode: .update)
+        let archive = await self.archive(for: #function, mode: .update)
         let entryName = "Test"
         let currentLFHOffset = archive.offsetToStartOfCentralDirectory
         do {
-            try archive.addEntry(with: entryName, type: .directory,
+            try await archive.addEntry(with: entryName, type: .directory,
                                  uncompressedSize: Int64(0), provider: { _, _ in return Data() })
         } catch {
             XCTFail("Failed to add directory entry to ZIP64 archive.")
         }
-        guard let entry = archive[entryName] else {
+        guard let entry = try await archive.get(entryName) else {
             XCTFail("Failed to retrieve ZIP64 format entry from archive"); return
         }
-        XCTAssert(archive.checkIntegrity())
+        await archive.checkIntegrity()
         XCTAssertNotNil(entry)
         XCTAssertEqual(entry.centralDirectoryStructure.relativeOffsetOfLocalHeader, UInt32.max)
         XCTAssertEqual(entry.centralDirectoryStructure.extraFieldData.scanValue(start: 4), currentLFHOffset)
     }
 
     /// Target fields: Total Number of Entries in Central Directory
-    func testCreateZIP64ArchiveWithTooManyEntries() {
+    func testCreateZIP64ArchiveWithTooManyEntries() async throws {
         let factor = 16
         self.mockIntMaxValues(int16Factor: factor)
         defer { self.resetIntMaxValues() }
-        let archive = self.archive(for: #function, mode: .create)
+        let archive = await self.archive(for: #function, mode: .create)
         let size = factor
         // Case 1: The total number of entries is less than maximum value
         do {
             for _ in 0..<factor - 1 {
                 let data = Data.makeRandomData(size: size)
                 let entryName = ProcessInfo.processInfo.globallyUniqueString
-                try archive.addFileEntry(with: entryName, size: size, data: data)
+                try await archive.addFileEntry(with: entryName, size: size, data: data)
             }
         } catch {
             XCTFail("Failed to add ZIP64 format entry to archive with error : \(error)"); return
         }
-        XCTAssert(archive.checkIntegrity())
+        await archive.checkIntegrity()
         XCTAssertEqual(archive.endOfCentralDirectoryRecord.totalNumberOfEntriesInCentralDirectory, UInt16(factor - 1))
         XCTAssertNil(archive.zip64EndOfCentralDirectory?.record.totalNumberOfEntriesInCentralDirectory)
         // Case 2: The total number os entries is equal to maximum value
         do {
-            try archive.addEntry(with: "Test", type: .directory,
+            try await archive.addEntry(with: "Test", type: .directory,
                                  uncompressedSize: Int64(0), provider: { _, _ in return Data() })
         } catch {
             XCTFail("Failed to add ZIP64 format entry to archive with error : \(error)"); return
         }
-        XCTAssert(archive.checkIntegrity())
+        await archive.checkIntegrity()
         XCTAssertEqual(archive.endOfCentralDirectoryRecord.totalNumberOfEntriesInCentralDirectory, UInt16.max)
         XCTAssertEqual(archive.zip64EndOfCentralDirectory?.record.totalNumberOfEntriesInCentralDirectory ?? 0,
                        UInt64(factor))
     }
 
     /// Target fields: Size of Central Directory
-    func testCreateZIP64ArchiveWithLargeSizeOfCD() {
+    func testCreateZIP64ArchiveWithLargeSizeOfCD() async throws {
         let factor = 10
         self.mockIntMaxValues(int32Factor: factor)
         defer { self.resetIntMaxValues() }
-        let archive = self.archive(for: #function, mode: .create)
+        let archive = await self.archive(for: #function, mode: .create)
         let size = 64
         // Case 1: The size of central directory is less than maximum value
         do {
-            try archive.addEntry(with: "link", type: .symlink, uncompressedSize: Int64(size),
+            try await archive.addEntry(with: "link", type: .symlink, uncompressedSize: Int64(size),
                                  provider: { (_, count) -> Data in
                                     return Data(count: count)
             })
         } catch {
             XCTFail("Failed to add ZIP64 format entry to archive with error : \(error)"); return
         }
-        XCTAssert(archive.checkIntegrity())
+        await archive.checkIntegrity()
         XCTAssertLessThan(archive.endOfCentralDirectoryRecord.sizeOfCentralDirectory, UInt32.max)
         XCTAssertNil(archive.zip64EndOfCentralDirectory?.record.sizeOfCentralDirectory)
         // Case 2: The size of central directory is greater than maximum value
         do {
             let data = Data.makeRandomData(size: size)
             let entryName = ProcessInfo.processInfo.globallyUniqueString
-            try archive.addFileEntry(with: entryName, size: size, data: data)
+            try await archive.addFileEntry(with: entryName, size: size, data: data)
         } catch {
             XCTFail("Failed to add ZIP64 format entry to archive with error : \(error)"); return
         }
-        XCTAssert(archive.checkIntegrity())
+        await archive.checkIntegrity()
         XCTAssertEqual(archive.endOfCentralDirectoryRecord.sizeOfCentralDirectory, UInt32.max)
         XCTAssertLessThan(0, archive.zip64EndOfCentralDirectory?.record.sizeOfCentralDirectory ?? 0)
     }
 
-    func testRemoveEntryFromArchiveWithZIP64EOCD() {
+    func testRemoveEntryFromArchiveWithZIP64EOCD() async throws {
         // testRemoveEntryFromArchiveWithZIP64EOCD.zip/
         //   ├─ data1.random (size: 64)
         //   ├─ data2.random (size: 64 * 64)
         self.mockIntMaxValues()
         defer { self.resetIntMaxValues() }
-        let archive = self.archive(for: #function, mode: .update)
-        guard let entry = archive["data1.random"] else {
+        let archive = await self.archive(for: #function, mode: .update)
+        guard let entry = try await archive.get("data1.random") else {
             XCTFail("Failed to retrieve ZIP64 format entry from archive"); return
         }
         // Should keep ZIP64 ecod
         do {
-            try archive.remove(entry)
+            try await archive.remove(entry)
         } catch {
             XCTFail("Failed to remove entry from archive with error : \(error)")
         }
-        XCTAssert(archive.checkIntegrity())
+        await archive.checkIntegrity()
         XCTAssertNotNil(archive.zip64EndOfCentralDirectory)
     }
 
-    func testRemoveZIP64EntryFromArchiveWithZIP64EOCD() {
+    func testRemoveZIP64EntryFromArchiveWithZIP64EOCD() async throws {
         // testRemoveEntryFromArchiveWithZIP64EOCD.zip/
         //   ├─ data1.random (size: 64)
         //   ├─ data2.random (size: 64 * 64)
         self.mockIntMaxValues()
         defer { self.resetIntMaxValues() }
-        let archive = self.archive(for: #function, mode: .update)
-        guard let entry = archive["data2.random"] else {
+        let archive = await self.archive(for: #function, mode: .update)
+        guard let entry = try await archive.get("data2.random") else {
             XCTFail("Failed to retrieve ZIP64 format entry from archive"); return
         }
         // Should remove ZIP64 eocd at the same time
         do {
-            try archive.remove(entry)
+            try await archive.remove(entry)
         } catch {
             XCTFail("Failed to remove entry from archive with error : \(error)")
         }
-        XCTAssert(archive.checkIntegrity())
+        await archive.checkIntegrity()
         XCTAssertNil(archive.zip64EndOfCentralDirectory)
     }
 
-    func testRemoveEntryWithZIP64ExtendedInformation() {
+    func testRemoveEntryWithZIP64ExtendedInformation() async throws {
         // testRemoveEntryFromArchiveWithZIP64EOCD.zip/
         //   ├─ data1.random (size: 64 * 32)
         //   ├─ data2.random (size: 64 * 32)
@@ -300,24 +300,24 @@ extension ZIPFoundationTests {
         //   ├─ data4.random (size: 64 * 32) [headerID: 1, dataSize: 8, ..0..0, relativeOffsetOfLocalHeader: 6270, ..0]
         self.mockIntMaxValues()
         defer { self.resetIntMaxValues() }
-        let archive = self.archive(for: #function, mode: .update)
-        guard let entry2 = archive["data2.random"] else {
+        let archive = await self.archive(for: #function, mode: .update)
+        guard let entry2 = try await archive.get("data2.random") else {
             XCTFail("Failed to retrieve ZIP64 format entry from archive"); return
         }
-        let entry3OriginalOffset = archive["data3.random"]?.zip64ExtendedInformation?.relativeOffsetOfLocalHeader ?? 0
+        let entry3OriginalOffset = try await archive.get("data3.random")?.zip64ExtendedInformation?.relativeOffsetOfLocalHeader ?? 0
         do {
-            try archive.remove(entry2)
+            try await archive.remove(entry2)
         } catch {
             XCTFail("Failed to remove entry from archive with error : \(error)")
         }
-        XCTAssert(archive.checkIntegrity())
+        await archive.checkIntegrity()
         // Should delete ZIP64 extended information of data3.random as offset changed
-        guard let entry3 = archive["data3.random"] else {
+        guard let entry3 = try await archive.get("data3.random") else {
             XCTFail("Failed to retrieve ZIP64 format entry from archive"); return
         }
         XCTAssertNil(entry3.zip64ExtendedInformation)
         // Should update ZIP64 extended information of data4.random as offset changed
-        guard let entry4 = archive["data4.random"] else {
+        guard let entry4 = try await archive.get("data4.random") else {
             XCTFail("Failed to retrieve ZIP64 format entry from archive"); return
         }
         XCTAssertEqual(entry4.zip64ExtendedInformation?.relativeOffsetOfLocalHeader, entry3OriginalOffset)
@@ -325,8 +325,8 @@ extension ZIPFoundationTests {
 }
 
 extension Archive {
-    fileprivate func addFileEntry(with name: String, size: Int, data: Data) throws {
-        try self.addEntry(with: name, type: .file,
+    fileprivate func addFileEntry(with name: String, size: Int, data: Data) async throws {
+        try await self.addEntry(with: name, type: .file,
                           uncompressedSize: Int64(size), provider: { (position, bufferSize) -> Data in
                             let upperBound = Swift.min(size, Int(position) + bufferSize)
                             let range = Range(uncheckedBounds: (lower: Int(position), upper: upperBound))

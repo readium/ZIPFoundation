@@ -11,33 +11,33 @@ import Foundation
 public protocol DataSource {
     
     /// Gets the total length of the source, if known.
-    func length() throws -> UInt64
+    func length() async throws -> UInt64
 
     /// Gets the current offset position.
-    func position() throws -> UInt64
+    func position() async throws -> UInt64
     
     /// Moves to the given offset position.
-    func seek(to position: UInt64) throws
+    func seek(to position: UInt64) async throws
     
     /// Reads the requested `length` amount of data.
-    func read(length: Int) throws -> Data
+    func read(length: Int) async throws -> Data
     
     /// Closes the underlying handles.
-    func close() throws
+    func close() async throws
 }
 
 public protocol WritableDataSource: DataSource {
     
     /// Writes the given `data` at the current position.
-    func write(_ data: Data) throws
+    func write(_ data: Data) async throws
     
-    func writeLargeChunk(_ data: Data, size: UInt64, bufferSize: Int) throws
+    func writeLargeChunk(_ data: Data, size: UInt64, bufferSize: Int) async throws
     
     /// Truncates the data source to the given `length`.
-    func truncate(to length: UInt64) throws
+    func truncate(to length: UInt64) async throws
     
     /// Commits any pending writing operations to the data source.
-    func flush() throws
+    func flush() async throws
 }
 
 public enum DataSourceError: Error {
@@ -47,8 +47,8 @@ public enum DataSourceError: Error {
 extension DataSource {
     
     /// Reads a single int from the data.
-    func readInt() throws -> UInt32 {
-        let data = try read(length: 4)
+    func readInt() async throws -> UInt32 {
+        let data = try await read(length: 4)
         guard data.count == 4 else {
             throw DataSourceError.unexpectedDataLength
         }
@@ -59,13 +59,13 @@ extension DataSource {
     }
 
     /// Reads a full serializable structure from the data.
-    func readStruct<T>(at position: UInt64) throws -> T? where T : DataSerializable {
-        try seek(to: position)
+    func readStruct<T>(at position: UInt64) async throws -> T? where T : DataSerializable {
+        try await seek(to: position)
         
-        return T(
-            data: try read(length: T.size),
+        return await T(
+            data: try await read(length: T.size),
             additionalDataProvider: { additionalDataSize -> Data in
-                try read(length: additionalDataSize)
+                try await read(length: additionalDataSize)
             }
         )
     }

@@ -30,23 +30,23 @@ extension ZIPFoundationTests {
         }
     }
 
-    func testZipCompressedZIP64Item() {
+    func testZipCompressedZIP64Item() async {
         do {
-            try archiveZIP64Item(for: #function, compressionMethod: .deflate)
+            try await archiveZIP64Item(for: #function, compressionMethod: .deflate)
         } catch {
             XCTFail("\(error)")
         }
     }
 
-    func testZipUncompressedZIP64Item() {
+    func testZipUncompressedZIP64Item() async {
         do {
-            try archiveZIP64Item(for: #function, compressionMethod: .none)
+            try await archiveZIP64Item(for: #function, compressionMethod: .none)
         } catch {
             XCTFail("\(error)")
         }
     }
 
-    func testUnzipCompressedZIP64Item() {
+    func testUnzipCompressedZIP64Item() async {
         // stored by zip 3.0 via command line: zip -0 -fz
         //
         // testUnzipCompressedZIP64Item.zip/
@@ -62,13 +62,13 @@ extension ZIPFoundationTests {
         //   ├─ data.random
         //   ├─ random.data
         do {
-            try unarchiveZIP64Item(for: #function)
+            try await unarchiveZIP64Item(for: #function)
         } catch {
             XCTFail("\(error)")
         }
     }
 
-    func testUnzipUncompressedZIP64Item() {
+    func testUnzipUncompressedZIP64Item() async {
         // stored by zip 3.0 via command line: zip -0 -fz
         //
         // testUnzipCompressedZIP64Item.zip/
@@ -84,17 +84,17 @@ extension ZIPFoundationTests {
         //   ├─ data.random
         //   ├─ random.data
         do {
-            try unarchiveZIP64Item(for: #function)
+            try await unarchiveZIP64Item(for: #function)
         } catch {
             XCTFail("\(error)")
         }
     }
 
-    func testUnzipItemWithZIP64DataDescriptor() {
+    func testUnzipItemWithZIP64DataDescriptor() async {
         // testUnzipCompressedZIP64Item.zip
         //   ├─ simple.data
         do {
-            try unarchiveZIP64Item(for: #function)
+            try await unarchiveZIP64Item(for: #function)
         } catch {
             XCTFail("\(error)")
         }
@@ -102,33 +102,34 @@ extension ZIPFoundationTests {
 
     // MARK: - Helpers
 
-    private func archiveZIP64Item(for testFunction: String, compressionMethod: CompressionMethod) throws {
+    private func archiveZIP64Item(for testFunction: String, compressionMethod: CompressionMethod) async throws {
         self.mockIntMaxValues(int32Factor: 16, int16Factor: 16)
         defer { self.resetIntMaxValues() }
         let assetURL = self.resourceURL(for: testFunction, pathExtension: "png")
         var fileArchiveURL = ZIPFoundationTests.tempZipDirectoryURL
         fileArchiveURL.appendPathComponent(self.archiveName(for: testFunction))
         do {
-            try FileManager().zipItem(at: assetURL, to: fileArchiveURL, compressionMethod: compressionMethod)
+            try await FileManager().zipItem(at: assetURL, to: fileArchiveURL, compressionMethod: compressionMethod)
         } catch {
             throw ZIP64FileManagerTestsError.failedToZipItem(url: assetURL)
         }
-        let archive = try Archive(url: fileArchiveURL, accessMode: .read)
-        XCTAssertNotNil(archive[assetURL.lastPathComponent])
-        XCTAssert(archive.checkIntegrity())
+        let archive = try await Archive(url: fileArchiveURL, accessMode: .read)
+        let entry = try await archive.get(assetURL.lastPathComponent)
+        XCTAssertNotNil(entry)
+        await archive.checkIntegrity()
     }
 
-    private func unarchiveZIP64Item(for testFunction: String) throws {
+    private func unarchiveZIP64Item(for testFunction: String) async throws {
         let fileManager = FileManager()
-        let archive = self.archive(for: testFunction, mode: .read)
+        let archive = await self.archive(for: testFunction, mode: .read)
         let destinationURL = self.createDirectory(for: testFunction)
         do {
-            try fileManager.unzipItem(at: archive.url!, to: destinationURL)
+            try await fileManager.unzipItem(at: archive.url!, to: destinationURL)
         } catch {
             throw ZIP64FileManagerTestsError.failedToUnzipItem
         }
         var itemsExist = false
-        for entry in archive {
+        for try await entry in archive {
             let directoryURL = destinationURL.appendingPathComponent(entry.path)
             itemsExist = fileManager.itemExists(at: directoryURL)
             if !itemsExist { break }

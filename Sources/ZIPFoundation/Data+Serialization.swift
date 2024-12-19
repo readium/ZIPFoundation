@@ -18,7 +18,7 @@ public typealias FILEPointer = UnsafeMutablePointer<FILE>
 
 protocol DataSerializable {
     static var size: Int { get }
-    init?(data: Data, additionalDataProvider: (Int) throws -> Data)
+    init?(data: Data, additionalDataProvider: (Int) async throws -> Data) async
     var data: Data { get }
 }
 
@@ -37,24 +37,23 @@ extension Data {
         #endif
     }
 
-    static func readStruct<T>(from file: FILEPointer, at offset: UInt64)
-    -> T? where T: DataSerializable {
+    static func readStruct<T>(from file: FILEPointer, at offset: UInt64) async -> T? where T: DataSerializable {
         guard offset <= .max else { return nil }
         fseeko(file, off_t(offset), SEEK_SET)
         guard let data = try? self.readChunk(of: T.size, from: file) else {
             return nil
         }
-        let structure = T(data: data, additionalDataProvider: { (additionalDataSize) -> Data in
+        let structure = await T(data: data, additionalDataProvider: { (additionalDataSize) -> Data in
             return try self.readChunk(of: additionalDataSize, from: file)
         })
         return structure
     }
 
     static func consumePart(of size: Int64, chunkSize: Int, skipCRC32: Bool = false,
-                            provider: Provider, consumer: Consumer) throws -> CRC32 {
+                            provider: Provider, consumer: Consumer) async throws -> CRC32 {
         var checksum = CRC32(0)
         guard size > 0 else {
-            try consumer(Data())
+            try await consumer(Data())
             return checksum
         }
 
@@ -64,8 +63,8 @@ extension Data {
         while bytesRead < size {
             let remainingSize = size - bytesRead
             chunkSize = remainingSize < chunkSize ? Int(remainingSize) : chunkSize
-            let data = try provider(bytesRead, chunkSize)
-            try consumer(data)
+            let data = try await provider(bytesRead, chunkSize)
+            try await consumer(data)
             if !skipCRC32 {
                 checksum = data.crc32(checksum: checksum)
             }

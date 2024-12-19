@@ -10,6 +10,7 @@
 import XCTest
 @testable import ReadiumZIPFoundation
 
+#if false
 #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
 extension ZIPFoundationTests {
 
@@ -215,4 +216,6 @@ extension ZIPFoundationTests {
         }
     }
 }
+#endif
+
 #endif

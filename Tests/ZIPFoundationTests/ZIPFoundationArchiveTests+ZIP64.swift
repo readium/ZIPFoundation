@@ -13,7 +13,7 @@ import XCTest
 
 extension ZIPFoundationTests {
 
-    func testArchiveZIP64EOCDRecord() {
+    func testArchiveZIP64EOCDRecord() async {
         let eocdRecordBytes: [UInt8] = [0x50, 0x4b, 0x06, 0x06, 0x2c, 0x00, 0x00, 0x00,
                                         0x00, 0x00, 0x00, 0x00, 0x2d, 0x00, 0x03, 0x15,
                                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -21,14 +21,14 @@ extension ZIPFoundationTests {
                                         0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                         0x4c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                         0x5a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-        let zip64EOCDRecord = Archive.ZIP64EndOfCentralDirectoryRecord(data: Data(eocdRecordBytes),
+        let zip64EOCDRecord = await Archive.ZIP64EndOfCentralDirectoryRecord(data: Data(eocdRecordBytes),
                                                                        additionalDataProvider: {_ -> Data in
                                                                         return Data() })
         XCTAssertNotNil(zip64EOCDRecord)
     }
 
-    func testArchiveInvalidZIP64EOCERecordConditions() {
-        let emptyEOCDRecord = Archive.ZIP64EndOfCentralDirectoryRecord(data: Data(),
+    func testArchiveInvalidZIP64EOCERecordConditions() async {
+        let emptyEOCDRecord = await Archive.ZIP64EndOfCentralDirectoryRecord(data: Data(),
                                                                        additionalDataProvider: {_ -> Data in
                                                                         return Data() })
         XCTAssertNil(emptyEOCDRecord)
@@ -40,7 +40,7 @@ extension ZIPFoundationTests {
                                                      0x4c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                                      0x5a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                                      0x00, 0x00]
-        let invalidEOCDRecord = Archive.ZIP64EndOfCentralDirectoryRecord(data: Data(eocdRecordIncludingExtraByte),
+        let invalidEOCDRecord = await Archive.ZIP64EndOfCentralDirectoryRecord(data: Data(eocdRecordIncludingExtraByte),
                                                                          additionalDataProvider: {_ -> Data in
                                                                             return Data() })
         XCTAssertNil(invalidEOCDRecord)
@@ -48,7 +48,7 @@ extension ZIPFoundationTests {
                                               0x00, 0x00, 0x00, 0x00, 0x2d, 0x00, 0x03, 0x15,
                                               0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                               0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-        let invalidEOCDRecord2 = Archive.ZIP64EndOfCentralDirectoryRecord(data: Data(eocdRecordMissingByte),
+        let invalidEOCDRecord2 = await Archive.ZIP64EndOfCentralDirectoryRecord(data: Data(eocdRecordMissingByte),
                                                                           additionalDataProvider: {_ -> Data in
                                                                              return Data() })
         XCTAssertNil(invalidEOCDRecord2)
@@ -59,37 +59,37 @@ extension ZIPFoundationTests {
                                                    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                                    0x4c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                                    0x5a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-        let invalidEOCDRecord3 = Archive.ZIP64EndOfCentralDirectoryRecord(data: Data(eocdRecordWithWrongVersion),
+        let invalidEOCDRecord3 = await Archive.ZIP64EndOfCentralDirectoryRecord(data: Data(eocdRecordWithWrongVersion),
                                                                           additionalDataProvider: {_ -> Data in
                                                                              return Data() })
         XCTAssertNil(invalidEOCDRecord3)
     }
 
-    func testArchiveZIP64EOCDLocator() {
+    func testArchiveZIP64EOCDLocator() async {
         let eocdLocatorBytes: [UInt8] = [0x50, 0x4b, 0x06, 0x07, 0x00, 0x00, 0x00, 0x00,
                                          0x9a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                          0x01, 0x00, 0x00, 0x00]
-        let zip64EOCDRecord = Archive.ZIP64EndOfCentralDirectoryLocator(data: Data(eocdLocatorBytes),
+        let zip64EOCDRecord = await Archive.ZIP64EndOfCentralDirectoryLocator(data: Data(eocdLocatorBytes),
                                                                         additionalDataProvider: {_ -> Data in
                                                                             return Data() })
         XCTAssertNotNil(zip64EOCDRecord)
     }
 
-    func testArchiveInvalidZIP64EOCDLocatorConditions() {
-        let emptyEOCDLocator = Archive.ZIP64EndOfCentralDirectoryLocator(data: Data(),
+    func testArchiveInvalidZIP64EOCDLocatorConditions() async {
+        let emptyEOCDLocator = await Archive.ZIP64EndOfCentralDirectoryLocator(data: Data(),
                                                                          additionalDataProvider: {_ -> Data in
                                                                             return Data() })
         XCTAssertNil(emptyEOCDLocator)
         let eocdLocatorIncludingExtraByte: [UInt8] = [0x50, 0x4b, 0x06, 0x07, 0x00, 0x00, 0x00, 0x00,
                                                       0x9a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                                       0x01, 0x00, 0x00, 0x00, 0x00]
-        let invalidEOCDLocator = Archive.ZIP64EndOfCentralDirectoryLocator(data: Data(eocdLocatorIncludingExtraByte),
+        let invalidEOCDLocator = await Archive.ZIP64EndOfCentralDirectoryLocator(data: Data(eocdLocatorIncludingExtraByte),
                                                                            additionalDataProvider: {_ -> Data in
                                                                             return Data() })
         XCTAssertNil(invalidEOCDLocator)
         let eocdLocatorMissingByte: [UInt8] = [0x50, 0x4b, 0x06, 0x07, 0x00, 0x00, 0x00, 0x00,
                                                0x9a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-        let invalidEOCDLocator2 = Archive.ZIP64EndOfCentralDirectoryLocator(data: Data(eocdLocatorMissingByte),
+        let invalidEOCDLocator2 = await Archive.ZIP64EndOfCentralDirectoryLocator(data: Data(eocdLocatorMissingByte),
                                                                            additionalDataProvider: {_ -> Data in
                                                                             return Data() })
         XCTAssertNil(invalidEOCDLocator2)

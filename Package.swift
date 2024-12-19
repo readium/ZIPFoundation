@@ -21,7 +21,7 @@ let targets: [Target] = [
 let package = Package(
     name: "ReadiumZIPFoundation",
     platforms: [
-        .macOS(.v10_13), .iOS(.v12), .tvOS(.v12), .watchOS(.v4), .visionOS(.v1)
+        .macOS(.v10_13), .iOS(.v13), .tvOS(.v12), .watchOS(.v4), .visionOS(.v1)
     ],
     products: [
         .library(name: "ReadiumZIPFoundation", targets: ["ReadiumZIPFoundation"])

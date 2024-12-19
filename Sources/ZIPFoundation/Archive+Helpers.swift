@@ -15,29 +15,29 @@ extension Archive {
     // MARK: - Reading
 
     func readUncompressed(entry: Entry, bufferSize: Int, skipCRC32: Bool,
-                          progress: Progress? = nil, with consumer: Consumer) throws -> CRC32 {
+                          progress: Progress? = nil, with consumer: Consumer) async throws -> CRC32 {
         let size = entry.centralDirectoryStructure.effectiveUncompressedSize
         guard size <= .max else { throw ArchiveError.invalidEntrySize }
-        return try Data.consumePart(of: Int64(size), chunkSize: bufferSize, skipCRC32: skipCRC32,
+        return try await Data.consumePart(of: Int64(size), chunkSize: bufferSize, skipCRC32: skipCRC32,
                                     provider: { (_, chunkSize) -> Data in
-                                        return try self.dataSource.read(length: chunkSize)
+                                        return try await self.dataSource.read(length: chunkSize)
                                     }, consumer: { (data) in
                                         if progress?.isCancelled == true { throw ArchiveError.cancelledOperation }
-                                        try consumer(data)
+                                        try await consumer(data)
                                         progress?.completedUnitCount += Int64(data.count)
                                     })
     }
 
     func readCompressed(entry: Entry, bufferSize: Int, skipCRC32: Bool,
-                        progress: Progress? = nil, with consumer: Consumer) throws -> CRC32 {
+                        progress: Progress? = nil, with consumer: Consumer) async throws -> CRC32 {
         let size = entry.centralDirectoryStructure.effectiveCompressedSize
         guard size <= .max else { throw ArchiveError.invalidEntrySize }
-        return try Data.decompress(size: Int64(size), bufferSize: bufferSize, skipCRC32: skipCRC32,
+        return try await Data.decompress(size: Int64(size), bufferSize: bufferSize, skipCRC32: skipCRC32,
                                    provider: { (_, chunkSize) -> Data in
-                                    return try self.dataSource.read(length: chunkSize)
+                                    return try await self.dataSource.read(length: chunkSize)
                                    }, consumer: { (data) in
                                     if progress?.isCancelled == true { throw ArchiveError.cancelledOperation }
-                                    try consumer(data)
+                                    try await consumer(data)
                                     progress?.completedUnitCount += Int64(data.count)
                                    })
     }
@@ -46,26 +46,30 @@ extension Archive {
 
     func writeEntry(uncompressedSize: Int64, type: Entry.EntryType,
                     compressionMethod: CompressionMethod, bufferSize: Int, progress: Progress? = nil,
-                    provider: Provider) throws -> (sizeWritten: Int64, crc32: CRC32) {
+                    provider: Provider) async throws -> (sizeWritten: Int64, crc32: CRC32) {
         var checksum = CRC32(0)
         var sizeWritten = Int64(0)
         switch type {
         case .file:
             switch compressionMethod {
             case .none:
-                (sizeWritten, checksum) = try self.writeUncompressed(size: uncompressedSize,
-                                                                     bufferSize: bufferSize,
-                                                                     progress: progress, provider: provider)
+                (sizeWritten, checksum) = try await self.writeUncompressed(
+                    size: uncompressedSize,
+                    bufferSize: bufferSize,
+                    progress: progress, provider: provider
+                )
             case .deflate:
-                (sizeWritten, checksum) = try self.writeCompressed(size: uncompressedSize,
-                                                                   bufferSize: bufferSize,
-                                                                   progress: progress, provider: provider)
+                (sizeWritten, checksum) = try await self.writeCompressed(
+                    size: uncompressedSize,
+                    bufferSize: bufferSize,
+                    progress: progress, provider: provider
+                )
             }
         case .directory:
-            _ = try provider(0, 0)
+            _ = try await provider(0, 0)
             if let progress = progress { progress.completedUnitCount = progress.totalUnitCount }
         case .symlink:
-            let (linkSizeWritten, linkChecksum) = try self.writeSymbolicLink(size: Int(uncompressedSize),
+            let (linkSizeWritten, linkChecksum) = try await self.writeSymbolicLink(size: Int(uncompressedSize),
                                                                              provider: provider)
             (sizeWritten, checksum) = (Int64(linkSizeWritten), linkChecksum)
             if let progress = progress { progress.completedUnitCount = progress.totalUnitCount }
@@ -75,7 +79,7 @@ extension Archive {
 
     func writeLocalFileHeader(path: String, compressionMethod: CompressionMethod,
                               size: (uncompressed: UInt64, compressed: UInt64), checksum: CRC32,
-                              modificationDateTime: (UInt16, UInt16)) throws -> LocalFileHeader {
+                              modificationDateTime: (UInt16, UInt16)) async throws -> LocalFileHeader {
         // We always set Bit 11 in generalPurposeBitFlag, which indicates an UTF-8 encoded path.
         guard let fileNameData = path.data(using: .utf8) else { throw ArchiveError.invalidEntryPath }
 
@@ -110,12 +114,12 @@ extension Archive {
                                               fileNameLength: UInt16(fileNameData.count),
                                               extraFieldLength: extraFieldLength, fileNameData: fileNameData,
                                               extraFieldData: zip64ExtendedInformation?.data ?? Data())
-        try writableDataSource.write(localFileHeader.data)
+        try await writableDataSource.write(localFileHeader.data)
         return localFileHeader
     }
 
     func writeCentralDirectoryStructure(localFileHeader: LocalFileHeader, relativeOffset: UInt64,
-                                        externalFileAttributes: UInt32) throws -> CentralDirectoryStructure {
+                                        externalFileAttributes: UInt32) async throws -> CentralDirectoryStructure {
         var extraUncompressedSize: UInt64?
         var extraCompressedSize: UInt64?
         var extraOffset: UInt64?
@@ -151,14 +155,14 @@ extension Archive {
                                                          relativeOffset: relativeOffsetOfCD,
                                                          extraField: (extraFieldLength,
                                                                       zip64ExtendedInformation?.data ?? Data()))
-        try writableDataSource.write(centralDirectory.data)
+        try await writableDataSource.write(centralDirectory.data)
         return centralDirectory
     }
 
     func writeEndOfCentralDirectory(centralDirectoryStructure: CentralDirectoryStructure,
                                     startOfCentralDirectory: UInt64,
                                     startOfEndOfCentralDirectory: UInt64,
-                                    operation: ModifyOperation) throws -> EndOfCentralDirectoryStructure {
+                                    operation: ModifyOperation) async throws -> EndOfCentralDirectoryStructure {
         var record = self.endOfCentralDirectoryRecord
         let sizeOfCD = self.sizeOfCentralDirectory
         let numberOfTotalEntries = self.totalNumberOfEntriesInCentralDirectory
@@ -193,7 +197,7 @@ extension Archive {
         // ZIP64 End of Central Directory
         var zip64EOCD: ZIP64EndOfCentralDirectory?
         if numberOfTotalEntriesForEOCD == .max || offsetOfCDForEOCD == .max || sizeOfCDForEOCD == .max {
-            zip64EOCD = try self.writeZIP64EOCD(totalNumberOfEntries: updatedNumberOfEntries,
+            zip64EOCD = try await self.writeZIP64EOCD(totalNumberOfEntries: updatedNumberOfEntries,
                                                 sizeOfCentralDirectory: updatedSizeOfCD,
                                                 offsetOfCentralDirectory: startOfCentralDirectory,
                                                 offsetOfEndOfCentralDirectory: startOfEndOfCentralDirectory)
@@ -202,21 +206,21 @@ extension Archive {
                                              numberOfEntriesInCentralDirectory: numberOfTotalEntriesForEOCD,
                                              updatedSizeOfCentralDirectory: sizeOfCDForEOCD,
                                              startOfCentralDirectory: offsetOfCDForEOCD)
-        try writableDataSource.write(record.data)
+        try await writableDataSource.write(record.data)
         return (record, zip64EOCD)
     }
 
     func writeUncompressed(size: Int64, bufferSize: Int, progress: Progress? = nil,
-                           provider: Provider) throws -> (sizeWritten: Int64, checksum: CRC32) {
+                           provider: Provider) async throws -> (sizeWritten: Int64, checksum: CRC32) {
         var position: Int64 = 0
         var sizeWritten: Int64 = 0
         var checksum = CRC32(0)
         while position < size {
             if progress?.isCancelled == true { throw ArchiveError.cancelledOperation }
             let readSize = (size - position) >= bufferSize ? bufferSize : Int(size - position)
-            let entryChunk = try provider(position, readSize)
+            let entryChunk = try await provider(position, readSize)
             checksum = entryChunk.crc32(checksum: checksum)
-            try writableDataSource.write(entryChunk)
+            try await writableDataSource.write(entryChunk)
             sizeWritten += Int64(entryChunk.count)
             position += Int64(bufferSize)
             progress?.completedUnitCount = sizeWritten
@@ -225,34 +229,34 @@ extension Archive {
     }
 
     func writeCompressed(size: Int64, bufferSize: Int, progress: Progress? = nil,
-                         provider: Provider) throws -> (sizeWritten: Int64, checksum: CRC32) {
+                         provider: Provider) async throws -> (sizeWritten: Int64, checksum: CRC32) {
         var sizeWritten: Int64 = 0
         let consumer: Consumer = { data in
-            try self.writableDataSource.write(data)
+            try await self.writableDataSource.write(data)
             sizeWritten += Int64(data.count)
         }
-        let checksum = try Data.compress(size: size, bufferSize: bufferSize,
+        let checksum = try await Data.compress(size: size, bufferSize: bufferSize,
                                          provider: { (position, size) -> Data in
                                             if progress?.isCancelled == true { throw ArchiveError.cancelledOperation }
-                                            let data = try provider(position, size)
+                                            let data = try await provider(position, size)
                                             progress?.completedUnitCount += Int64(data.count)
                                             return data
                                          }, consumer: consumer)
         return(sizeWritten, checksum)
     }
 
-    func writeSymbolicLink(size: Int, provider: Provider) throws -> (sizeWritten: Int, checksum: CRC32) {
+    func writeSymbolicLink(size: Int, provider: Provider) async throws -> (sizeWritten: Int, checksum: CRC32) {
         // The reported size of a symlink is the number of characters in the path it points to.
-        let linkData = try provider(0, size)
+        let linkData = try await provider(0, size)
         let checksum = linkData.crc32(checksum: 0)
-        try writableDataSource.write(linkData)
+        try await writableDataSource.write(linkData)
         return (linkData.count, checksum)
     }
 
     func writeZIP64EOCD(totalNumberOfEntries: UInt64,
                         sizeOfCentralDirectory: UInt64,
                         offsetOfCentralDirectory: UInt64,
-                        offsetOfEndOfCentralDirectory: UInt64) throws -> ZIP64EndOfCentralDirectory {
+                        offsetOfEndOfCentralDirectory: UInt64) async throws -> ZIP64EndOfCentralDirectory {
         var zip64EOCD: ZIP64EndOfCentralDirectory = self.zip64EndOfCentralDirectory ?? {
             // Shouldn't include the leading 12 bytes: (size - 12 = 44)
             let record = ZIP64EndOfCentralDirectoryRecord(sizeOfZIP64EndOfCentralDirectoryRecord: UInt64(44),
@@ -278,7 +282,7 @@ extension Archive {
         let updatedLocator = ZIP64EndOfCentralDirectoryLocator(locator: zip64EOCD.locator,
                                                                offsetOfZIP64EOCDRecord: offsetOfEndOfCentralDirectory)
         zip64EOCD = ZIP64EndOfCentralDirectory(record: updatedRecord, locator: updatedLocator)
-        try writableDataSource.write(zip64EOCD.data)
+        try await writableDataSource.write(zip64EOCD.data)
         return zip64EOCD
     }
 }

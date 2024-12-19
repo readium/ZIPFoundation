@@ -61,18 +61,18 @@ extension ZIPFoundationTests {
         XCTAssertEqual(zip64Field.data, Data(expectedZIP64ExtraFieldBytes))
     }
 
-    func testEntryValidZIP64DataDescriptor() {
+    func testEntryValidZIP64DataDescriptor() async {
         let zip64DDBytes: [UInt8] = [0x50, 0x4b, 0x07, 0x08, 0x00, 0x00, 0x00, 0x00,
                                      0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                      0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-        let zip64DataDescriptor = Entry.ZIP64DataDescriptor(data: Data(zip64DDBytes),
+        let zip64DataDescriptor = await Entry.ZIP64DataDescriptor(data: Data(zip64DDBytes),
                                                             additionalDataProvider: {_ -> Data in
                                                                 return Data() })
         XCTAssertEqual(zip64DataDescriptor?.uncompressedSize, 10)
         XCTAssertEqual(zip64DataDescriptor?.compressedSize, 10)
     }
 
-    func testEntryWithZIP64ExtraField() {
+    func testEntryWithZIP64ExtraField() async {
         // Central Directory
         let extraFieldBytesIncludingSizeFields: [UInt8] = [0x01, 0x00, 0x10, 0x00, 0x0a, 0x00, 0x00, 0x00,
                                                            0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,
@@ -83,7 +83,7 @@ extension ZIPFoundationTests {
                                  0xff, 0xff, 0xff, 0xff, 0x01, 0x00, 0x14, 0x00,
                                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                  0xb0, 0x11, 0x00, 0x00, 0x00, 0x00]
-        guard let cds = Entry.CentralDirectoryStructure(data: Data(cdsBytes),
+        guard let cds = await Entry.CentralDirectoryStructure(data: Data(cdsBytes),
                                                         additionalDataProvider: { count -> Data in
                                                             guard let name = "/".data(using: .utf8) else {
                                                                 throw AdditionalDataError.encodingError
@@ -102,7 +102,7 @@ extension ZIPFoundationTests {
                                  0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                  0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x0a, 0x00,
                                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-        guard let lfh = Entry.LocalFileHeader(data: Data(lfhBytes),
+        guard let lfh = await Entry.LocalFileHeader(data: Data(lfhBytes),
                                               additionalDataProvider: { _ -> Data in
                                                 return Data()
                                               }) else {

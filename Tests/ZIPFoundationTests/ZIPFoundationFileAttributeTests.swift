@@ -13,14 +13,14 @@ import XCTest
 
 extension ZIPFoundationTests {
 
-    func testFileAttributeHelperMethods() {
+    func testFileAttributeHelperMethods() async {
         let cdsBytes: [UInt8] = [0x50, 0x4b, 0x01, 0x02, 0x1e, 0x15, 0x14, 0x00,
                                  0x08, 0x08, 0x08, 0x00, 0xab, 0x85, 0x77, 0x47,
                                  0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
                                  0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
                                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                  0xb0, 0x11, 0x00, 0x00, 0x00, 0x00]
-        guard let cds = Entry.CentralDirectoryStructure(data: Data(cdsBytes),
+        guard let cds = await Entry.CentralDirectoryStructure(data: Data(cdsBytes),
                                                         additionalDataProvider: { count -> Data in
             guard let pathData = "/".data(using: .utf8) else {
                 throw AdditionalDataError.encodingError
@@ -34,7 +34,7 @@ extension ZIPFoundationTests {
                                  0x08, 0x00, 0xab, 0x85, 0x77, 0x47, 0x00, 0x00,
                                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-        guard let lfh = Entry.LocalFileHeader(data: Data(lfhBytes),
+        guard let lfh = await Entry.LocalFileHeader(data: Data(lfhBytes),
                                               additionalDataProvider: { _ -> Data in return Data() })
         else {
             XCTFail("Failed to read local file header."); return
@@ -49,33 +49,33 @@ extension ZIPFoundationTests {
         XCTAssert(permissions == defaultDirectoryPermissions)
     }
 
-    func testSymlinkPermissionsTransferErrorConditions() {
+    func testSymlinkPermissionsTransferErrorConditions() async {
         let fileManager = FileManager()
         let assetURL = self.resourceURL(for: #function, pathExtension: "png")
-        XCTAssertSwiftError(try fileManager.setAttributes([:], ofItemAtURL: assetURL, traverseLink: false),
+        await XCTAssertSwiftError(try fileManager.setAttributes([:], ofItemAtURL: assetURL, traverseLink: false),
                             throws: Entry.EntryError.missingPermissionsAttributeError)
         let permissions = NSNumber(value: Int16(0o753))
         let tempPath = NSTemporaryDirectory()
         var nonExistantURL = URL(fileURLWithPath: tempPath)
         nonExistantURL.appendPathComponent("invalid.path")
-        XCTAssertPOSIXError(try fileManager.setAttributes([.posixPermissions: permissions],
+        await XCTAssertPOSIXError(try fileManager.setAttributes([.posixPermissions: permissions],
                                                           ofItemAtURL: nonExistantURL, traverseLink: false),
                             throwsErrorWithCode: .ENOENT)
-        XCTAssertSwiftError(try fileManager.setAttributes([.posixPermissions: permissions],
+        await XCTAssertSwiftError(try fileManager.setAttributes([.posixPermissions: permissions],
                                                           ofItemAtURL: assetURL, traverseLink: false),
                             throws: Entry.EntryError.missingModificationDateAttributeError)
-        XCTAssertPOSIXError( try fileManager.setAttributes([.posixPermissions: permissions, .modificationDate: Date()],
+        await XCTAssertPOSIXError( try fileManager.setAttributes([.posixPermissions: permissions, .modificationDate: Date()],
                                                            ofItemAtURL: nonExistantURL, traverseLink: false),
                              throwsErrorWithCode: .ENOENT)
     }
 
-    func testSymlinkModificationDateTransferErrorConditions() {
+    func testSymlinkModificationDateTransferErrorConditions() async {
         let fileManager = FileManager()
         var assetURL = self.resourceURL(for: #function, pathExtension: "png")
         let tempPath = NSTemporaryDirectory()
         var nonExistantURL = URL(fileURLWithPath: tempPath)
         nonExistantURL.appendPathComponent("invalid.path")
-        XCTAssertPOSIXError(try fileManager.setSymlinkModificationDate(Date(), ofItemAtURL: nonExistantURL),
+        await XCTAssertPOSIXError(try fileManager.setSymlinkModificationDate(Date(), ofItemAtURL: nonExistantURL),
                             throwsErrorWithCode: .ENOENT)
 #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
         var resourceValues = URLResourceValues()
@@ -85,7 +85,7 @@ extension ZIPFoundationTests {
             resourceValues.isUserImmutable = false
             try? assetURL.setResourceValues(resourceValues)
         }
-        XCTAssertPOSIXError(try fileManager.setSymlinkModificationDate(Date(), ofItemAtURL: assetURL),
+        await XCTAssertPOSIXError(try fileManager.setSymlinkModificationDate(Date(), ofItemAtURL: assetURL),
                             throwsErrorWithCode: .EPERM)
 #endif
     }
@@ -99,15 +99,15 @@ extension ZIPFoundationTests {
         XCTAssert(permissions == defaultDirectoryPermissions)
     }
 
-    func testFileModificationDateHelperMethods() {
+    func testFileModificationDateHelperMethods() async {
         guard let nonFileURL = URL(string: "https://www.peakstep.com/") else {
             XCTFail("Failed to create file URL."); return
         }
 
-        XCTAssertCocoaError(try FileManager.fileModificationDateTimeForItem(at: nonFileURL),
+        await XCTAssertCocoaError(try FileManager.fileModificationDateTimeForItem(at: nonFileURL),
                             throwsErrorWithCode: CocoaError.fileReadNoSuchFile)
         let nonExistantURL = URL(fileURLWithPath: "/nonexistant")
-        XCTAssertCocoaError(try FileManager.fileModificationDateTimeForItem(at: nonExistantURL),
+        await XCTAssertCocoaError(try FileManager.fileModificationDateTimeForItem(at: nonExistantURL),
                             throwsErrorWithCode: CocoaError.fileReadNoSuchFile)
         let msDOSDate = Date(timeIntervalSince1970: TimeInterval(Int.min)).fileModificationDate
         XCTAssert(msDOSDate == 0)
@@ -119,25 +119,25 @@ extension ZIPFoundationTests {
         XCTAssert(invalidLateMSDOSDate == 60961)
     }
 
-    func testFileSizeHelperMethods() {
+    func testFileSizeHelperMethods() async {
         let nonExistantURL = URL(fileURLWithPath: "/nonexistant")
-        XCTAssertCocoaError(try FileManager.fileSizeForItem(at: nonExistantURL),
+        await XCTAssertCocoaError(try FileManager.fileSizeForItem(at: nonExistantURL),
                             throwsErrorWithCode: CocoaError.fileReadNoSuchFile)
     }
 
-    func testFileTypeHelperMethods() {
+    func testFileTypeHelperMethods() async {
         let nonExistantURL = URL(fileURLWithPath: "/nonexistant")
-        XCTAssertCocoaError(try FileManager.typeForItem(at: nonExistantURL),
+        await XCTAssertCocoaError(try FileManager.typeForItem(at: nonExistantURL),
                             throwsErrorWithCode: CocoaError.fileReadNoSuchFile)
         guard let nonFileURL = URL(string: "https://www.peakstep.com") else {
             XCTFail("Failed to create test URL."); return
         }
 
-        XCTAssertCocoaError(try FileManager.typeForItem(at: nonFileURL),
+        await XCTAssertCocoaError(try FileManager.typeForItem(at: nonFileURL),
                             throwsErrorWithCode: CocoaError.fileReadNoSuchFile)
     }
 
-    func testFileModificationDate() {
+    func testFileModificationDate() async {
         var testDateComponents = DateComponents()
         testDateComponents.calendar = Calendar(identifier: Calendar.Identifier.gregorian)
         testDateComponents.timeZone = TimeZone(identifier: "UTC")
@@ -152,13 +152,13 @@ extension ZIPFoundationTests {
         }
         let assetURL = self.resourceURL(for: #function, pathExtension: "png")
         let fileManager = FileManager()
-        let archive = self.archive(for: #function, mode: .create)
+        let archive = await self.archive(for: #function, mode: .create)
         do {
             try fileManager.setAttributes([.modificationDate: testDate], ofItemAtPath: assetURL.path)
             let relativePath = assetURL.lastPathComponent
             let baseURL = assetURL.deletingLastPathComponent()
-            try archive.addEntry(with: relativePath, relativeTo: baseURL)
-            guard let entry = archive["\(assetURL.lastPathComponent)"] else {
+            try await archive.addEntry(with: relativePath, relativeTo: baseURL)
+            guard let entry = try await archive.get("\(assetURL.lastPathComponent)") else {
                 throw Archive.ArchiveError.unreadableArchive
             }
             guard let fileDate = entry.fileAttributes[.modificationDate] as? Date else {
@@ -172,17 +172,17 @@ extension ZIPFoundationTests {
         } catch { XCTFail("Failed to test last file modification date") }
     }
 
-    func testPOSIXPermissions() {
+    func testPOSIXPermissions() async {
         let permissions = NSNumber(value: Int16(0o753))
         let assetURL = self.resourceURL(for: #function, pathExtension: "png")
         let fileManager = FileManager()
-        let archive = self.archive(for: #function, mode: .create)
+        let archive = await self.archive(for: #function, mode: .create)
         do {
             try fileManager.setAttributes([.posixPermissions: permissions], ofItemAtPath: assetURL.path)
             let relativePath = assetURL.lastPathComponent
             let baseURL = assetURL.deletingLastPathComponent()
-            try archive.addEntry(with: relativePath, relativeTo: baseURL)
-            guard let entry = archive["\(assetURL.lastPathComponent)"] else {
+            try await archive.addEntry(with: relativePath, relativeTo: baseURL)
+            guard let entry = try await archive.get("\(assetURL.lastPathComponent)") else {
                 throw Archive.ArchiveError.unreadableArchive
             }
             guard let filePermissions = entry.fileAttributes[.posixPermissions] as? NSNumber else {

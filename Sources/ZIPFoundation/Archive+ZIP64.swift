@@ -74,7 +74,7 @@ extension Archive.ZIP64EndOfCentralDirectoryRecord {
         return data
     }
 
-    init?(data: Data, additionalDataProvider provider: (Int) throws -> Data) {
+    init?(data: Data, additionalDataProvider provider: (Int) async throws -> Data) async {
         guard data.count == Archive.ZIP64EndOfCentralDirectoryRecord.size else { return nil }
         guard data.scanValue(start: 0) == zip64EOCDRecordSignature else { return nil }
         self.sizeOfZIP64EndOfCentralDirectoryRecord = data.scanValue(start: 4)
@@ -123,7 +123,7 @@ extension Archive.ZIP64EndOfCentralDirectoryLocator {
         return data
     }
 
-    init?(data: Data, additionalDataProvider provider: (Int) throws -> Data) {
+    init?(data: Data, additionalDataProvider provider: (Int) async throws -> Data) async {
         guard data.count == Archive.ZIP64EndOfCentralDirectoryLocator.size else { return nil }
         guard data.scanValue(start: 0) == zip64EOCDLocatorSignature else { return nil }
         self.numberOfDiskWithZIP64EOCDRecordStart = data.scanValue(start: 4)

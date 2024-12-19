@@ -28,14 +28,14 @@ public typealias CRC32 = UInt32
 /// - Parameters:
 ///   - data: A chunk of `Data` to consume.
 /// - Throws: Can throw to indicate errors during data consumption.
-public typealias Consumer = (_ data: Data) throws -> Void
+public typealias Consumer = (_ data: Data) async throws -> Void
 /// A custom handler that receives a position and a size that can be used to provide data from an arbitrary source.
 /// - Parameters:
 ///   - position: The current read position.
 ///   - size: The size of the chunk to provide.
 /// - Returns: A chunk of `Data`.
 /// - Throws: Can throw to indicate errors in the data source.
-public typealias Provider = (_ position: Int64, _ size: Int) throws -> Data
+public typealias Provider = (_ position: Int64, _ size: Int) async throws -> Data
 
 extension Data {
     enum CompressionError: Error {
@@ -65,9 +65,9 @@ extension Data {
     ///   - provider: A closure that accepts a position and a chunk size. Returns a `Data` chunk.
     ///   - consumer: A closure that processes the result of the compress operation.
     /// - Returns: The checksum of the processed content.
-    public static func compress(size: Int64, bufferSize: Int, provider: Provider, consumer: Consumer) throws -> CRC32 {
+    public static func compress(size: Int64, bufferSize: Int, provider: Provider, consumer: Consumer) async throws -> CRC32 {
         #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
-        return try self.process(operation: COMPRESSION_STREAM_ENCODE, size: size, bufferSize: bufferSize,
+        return try await self.process(operation: COMPRESSION_STREAM_ENCODE, size: size, bufferSize: bufferSize,
                                 provider: provider, consumer: consumer)
         #else
         return try self.encode(size: size, bufferSize: bufferSize, provider: provider, consumer: consumer)
@@ -83,9 +83,9 @@ extension Data {
     ///   - consumer: A closure that processes the result of the decompress operation.
     /// - Returns: The checksum of the processed content.
     public static func decompress(size: Int64, bufferSize: Int, skipCRC32: Bool,
-                                  provider: Provider, consumer: Consumer) throws -> CRC32 {
+                                  provider: Provider, consumer: Consumer) async throws -> CRC32 {
         #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
-        return try self.process(operation: COMPRESSION_STREAM_DECODE, size: size, bufferSize: bufferSize,
+        return try await self.process(operation: COMPRESSION_STREAM_DECODE, size: size, bufferSize: bufferSize,
                                 skipCRC32: skipCRC32, provider: provider, consumer: consumer)
         #else
         return try self.decode(bufferSize: bufferSize, skipCRC32: skipCRC32, provider: provider, consumer: consumer)
@@ -101,7 +101,7 @@ import Compression
 extension Data {
 
     static func process(operation: compression_stream_operation, size: Int64, bufferSize: Int, skipCRC32: Bool = false,
-                        provider: Provider, consumer: Consumer) throws -> CRC32 {
+                        provider: Provider, consumer: Consumer) async throws -> CRC32 {
         var crc32 = CRC32(0)
         let destPointer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
         defer { destPointer.deallocate() }
@@ -120,7 +120,7 @@ extension Data {
             let isExhausted = stream.src_size == 0
             if isExhausted {
                 do {
-                    sourceData = try provider(position, Int(Swift.min((size - position), Int64(bufferSize))))
+                    sourceData = try await provider(position, Int(Swift.min((size - position), Int64(bufferSize))))
                     position += Int64(stream.prepare(for: sourceData))
                 } catch { throw error }
             }
@@ -139,7 +139,7 @@ extension Data {
             switch status {
             case COMPRESSION_STATUS_OK, COMPRESSION_STATUS_END:
                 let outputData = Data(bytesNoCopy: destPointer, count: bufferSize - stream.dst_size, deallocator: .none)
-                try consumer(outputData)
+                try await consumer(outputData)
                 if operation == COMPRESSION_STREAM_DECODE && !skipCRC32 { crc32 = outputData.crc32(checksum: crc32) }
                 stream.dst_ptr = destPointer
                 stream.dst_size = bufferSize
