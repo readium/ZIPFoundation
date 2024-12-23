@@ -170,7 +170,6 @@ extension FileManager {
             return
         }
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
         guard let posixPermissions = attributes[.posixPermissions] as? NSNumber else {
             throw Entry.EntryError.missingPermissionsAttributeError
         }
@@ -182,12 +181,6 @@ extension FileManager {
         }
 
         try self.setSymlinkModificationDate(modificationDate, ofItemAtURL: url)
-#else
-        // Since non-Darwin POSIX platforms ignore permissions on symlinks and swift-corelibs-foundation
-        // currently doesn't support setting the modification date, this codepath is currently a no-op
-        // on these platforms.
-        return
-#endif
     }
 
     func setSymlinkPermissions(_ posixPermissions: NSNumber, ofItemAtURL url: URL) throws {
@@ -224,10 +217,7 @@ extension FileManager {
         let fileDate = centralDirectoryStructure.lastModFileDate
         let defaultPermissions = entryType == .directory ? defaultDirectoryPermissions : defaultFilePermissions
         var attributes = [.posixPermissions: defaultPermissions] as [FileAttributeKey: Any]
-        // Certain keys are not yet supported in swift-corelibs
-#if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
         attributes[.modificationDate] = Date(dateTime: (fileDate, fileTime))
-#endif
         let versionMadeBy = centralDirectoryStructure.versionMadeBy
         guard let osType = Entry.OSType(rawValue: UInt(versionMadeBy >> 8)) else { return attributes }
 
