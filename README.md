@@ -168,9 +168,7 @@ let fileManager = FileManager()
 let currentWorkingPath = fileManager.currentDirectoryPath
 var archiveURL = URL(fileURLWithPath: currentWorkingPath)
 archiveURL.appendPathComponent("archive.zip")
-guard let archive = Archive(url: archiveURL, accessMode: .read) else  {
-    return
-}
+let archive = try Archive(url: archiveURL, accessMode: .read)
 guard let entry = archive["file.txt"] else {
     return
 }
@@ -190,12 +188,11 @@ You can find detailed information about that parameters in the method's document
 To create a new `Archive`, pass in a non-existing file URL and `AccessMode.create`.
 
 ```swift
+let fileManager = FileManager()
 let currentWorkingPath = fileManager.currentDirectoryPath
 var archiveURL = URL(fileURLWithPath: currentWorkingPath)
 archiveURL.appendPathComponent("newArchive.zip")
-guard let archive = Archive(url: archiveURL, accessMode: .create) else  {
-    return
-}
+let archive = try Archive(url: archiveURL, accessMode: .create)
 ```
 
 ### Adding and Removing Entries
@@ -209,9 +206,7 @@ let fileManager = FileManager()
 let currentWorkingPath = fileManager.currentDirectoryPath
 var archiveURL = URL(fileURLWithPath: currentWorkingPath)
 archiveURL.appendPathComponent("archive.zip")
-guard let archive = Archive(url: archiveURL, accessMode: .update) else  {
-    return
-}
+let archive = try Archive(url: archiveURL, accessMode: .update)
 var fileURL = URL(fileURLWithPath: currentWorkingPath)
 fileURL.appendPathComponent("file.txt")
 do {
@@ -274,11 +269,11 @@ To _create_ an in-memory archive, the `data` parameter can be omitted:
 
 ```swift
 let string = "Some string!"
-guard let archive = Archive(accessMode: .create),
-        let data = string.data(using: .utf8) else { return }
-    try? archive.addEntry(with: "inMemory.txt", type: .file, uncompressedSize: UInt64(data.count), bufferSize: 4, provider: { (position, size) -> Data in
-        return data.subdata(in: position..<position+size)
-    })
+let archive = try Archive(accessMode: .create)
+guard let data = string.data(using: .utf8) else { return }
+try archive.addEntry(with: "inMemory.txt", type: .file, uncompressedSize: Int64(data.count), bufferSize: 4, provider: { (position, size) -> Data in
+    return data.subdata(in: Data.Index(position)..<Int(position)+size)
+})
 let archiveData = archive.data
 ```
 
