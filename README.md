@@ -251,9 +251,9 @@ You can also add entries from an in-memory data source. To do this you have to p
 ```swift
 let string = "abcdefghijkl"
 guard let data = string.data(using: .utf8) else { return }
-try? archive.addEntry(with: "fromMemory.txt", type: .file, uncompressedSize: UInt64(data.count), bufferSize: 4, provider: { (position, size) -> Data in
+try? archive.addEntry(with: "fromMemory.txt", type: .file, uncompressedSize: Int64(data.count), bufferSize: 4, provider: { (position, size) -> Data in
     // This will be called until `data` is exhausted (3x in this case).
-    return data.subdata(in: position..<position+size)
+    return data.subdata(in: Data.Index(position)..<Int(position)+size)
 })
 ```
 The closure is called until enough data has been provided to create an entry of `uncompressedSize`. The closure receives `position` and `size` arguments 
