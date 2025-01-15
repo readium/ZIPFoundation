@@ -138,7 +138,7 @@ extension Data {
             }
             switch status {
             case COMPRESSION_STATUS_OK, COMPRESSION_STATUS_END:
-                let outputData = Data(bytesNoCopy: destPointer, count: bufferSize - stream.dst_size, deallocator: .none)
+                let outputData = Data(bytes: destPointer, count: bufferSize - stream.dst_size)
                 try await consumer(outputData)
                 if operation == COMPRESSION_STREAM_DECODE && !skipCRC32 { crc32 = outputData.crc32(checksum: crc32) }
                 stream.dst_ptr = destPointer
