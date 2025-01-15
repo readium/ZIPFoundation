@@ -23,7 +23,7 @@ public protocol DataSource {
     func read(length: Int) async throws -> Data
     
     /// Closes the underlying handles.
-    func close() async throws
+    func close() throws
 }
 
 public protocol WritableDataSource: DataSource {

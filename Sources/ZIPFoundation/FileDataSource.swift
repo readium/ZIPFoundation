@@ -108,7 +108,17 @@ actor FileDataSource : WritableDataSource {
         try checkNoError()
     }
     
-    func close() async throws {
+    nonisolated func close() {
+        Task {
+            do {
+                try await close()
+            } catch {
+                print(error)
+            }
+        }
+    }
+    
+    private func close() async throws {
         guard !isClosed else {
             return
         }

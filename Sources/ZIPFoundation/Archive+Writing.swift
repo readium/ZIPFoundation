@@ -225,7 +225,7 @@ extension Archive {
     func replaceCurrentArchive(with archive: Archive) async throws {
         guard let url = self.url, let archiveURL = archive.url else { throw ArchiveError.unwritableArchive }
 
-        try await dataSource.close()
+        try dataSource.close()
         
         if self.isMemoryArchive {
             #if swift(>=5.0)

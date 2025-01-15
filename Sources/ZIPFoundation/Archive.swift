@@ -226,10 +226,7 @@ public final class Archive: AsyncSequence {
 #endif
     
     deinit {
-        let dataSource = dataSource
-        Task {
-            try? await dataSource.close()
-        }
+        try? dataSource.close()
     }
 
     public func makeAsyncIterator() -> Iterator {
