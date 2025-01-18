@@ -32,25 +32,25 @@ extension ZIPFoundationTests {
         }
     }
 
-    func testExtractUncompressedZIP64Entries() {
+    func testExtractUncompressedZIP64Entries() async {
         do {
-            try extractEntryFromZIP64Archive(for: #function)
+            try await extractEntryFromZIP64Archive(for: #function)
         } catch {
             XCTFail("\(error)")
         }
     }
 
-    func testExtractCompressedZIP64Entries() {
+    func testExtractCompressedZIP64Entries() async {
         do {
-            try extractEntryFromZIP64Archive(for: #function)
+            try await extractEntryFromZIP64Archive(for: #function)
         } catch {
             XCTFail("\(error)")
         }
     }
 
-    func testExtractEntryWithZIP64DataDescriptor() {
+    func testExtractEntryWithZIP64DataDescriptor() async {
         do {
-            try extractEntryFromZIP64Archive(for: #function, reservedFileName: "simple.data")
+            try await extractEntryFromZIP64Archive(for: #function, reservedFileName: "simple.data")
         } catch {
             XCTFail("\(error)")
         }
@@ -58,15 +58,15 @@ extension ZIPFoundationTests {
 
     // MARK: - Helpers
 
-    private func extractEntryFromZIP64Archive(for testFunction: String, reservedFileName: String? = nil) throws {
-        let archive = self.archive(for: testFunction, mode: .read)
+    private func extractEntryFromZIP64Archive(for testFunction: String, reservedFileName: String? = nil) async throws {
+        let archive = await self.archive(for: testFunction, mode: .read)
         let fileName = reservedFileName ?? testFunction.replacingOccurrences(of: "()", with: ".png")
-        guard let entry = archive[fileName] else {
+        guard let entry = try await archive.get(fileName) else {
             throw ZIP64ReadingTestsError.failedToReadEntry(name: fileName)
         }
         do {
             // Test extracting to memory
-            let checksum = try archive.extract(entry, bufferSize: 32, consumer: { _ in })
+            let checksum = try await archive.extract(entry, bufferSize: 32, consumer: { _ in })
             XCTAssert(entry.checksum == checksum)
         } catch {
             throw ZIP64ReadingTestsError.failedToExtractEntry(type: .memory)
@@ -75,7 +75,7 @@ extension ZIPFoundationTests {
             // Test extracting to file
             var fileURL = self.createDirectory(for: testFunction)
             fileURL.appendPathComponent(entry.path)
-            let checksum = try archive.extract(entry, to: fileURL)
+            let checksum = try await archive.extract(entry, to: fileURL)
             XCTAssert(entry.checksum == checksum)
             let fileManager = FileManager()
             XCTAssertTrue(fileManager.itemExists(at: fileURL))

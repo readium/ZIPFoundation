@@ -13,24 +13,24 @@ import XCTest
 
 extension ZIPFoundationTests {
 
-    func testWriteEOCDWithTooLargeSizeOfCentralDirectory() {
-        let archive = self.archive(for: #function, mode: .create)
+    func testWriteEOCDWithTooLargeSizeOfCentralDirectory() async {
+        let archive = await self.archive(for: #function, mode: .create)
         archive.zip64EndOfCentralDirectory = makeMockZIP64EndOfCentralDirectory(sizeOfCentralDirectory: .max,
                                                                                 numberOfEntries: 0)
-        XCTAssertSwiftError(
-            try archive.writeEndOfCentralDirectory(centralDirectoryStructure: makeMockCentralDirectory()!,
+        await XCTAssertSwiftError(
+            try await archive.writeEndOfCentralDirectory(centralDirectoryStructure: makeMockCentralDirectory()!,
                                                                    startOfCentralDirectory: 0,
                                                                    startOfEndOfCentralDirectory: 0,
                                                                    operation: .add),
                             throws: Archive.ArchiveError.invalidCentralDirectorySize)
     }
 
-    func testWriteEOCDWithTooLargeCentralDirectoryOffset() {
-        let archive = self.archive(for: #function, mode: .create)
+    func testWriteEOCDWithTooLargeCentralDirectoryOffset() async {
+        let archive = await self.archive(for: #function, mode: .create)
         archive.zip64EndOfCentralDirectory = makeMockZIP64EndOfCentralDirectory(sizeOfCentralDirectory: 0,
                                                                                 numberOfEntries: .max)
-        XCTAssertSwiftError(
-            try archive.writeEndOfCentralDirectory(centralDirectoryStructure: makeMockCentralDirectory()!,
+        await XCTAssertSwiftError(
+            try await archive.writeEndOfCentralDirectory(centralDirectoryStructure: makeMockCentralDirectory()!,
                                                                    startOfCentralDirectory: 0,
                                                                    startOfEndOfCentralDirectory: 0,
                                                                    operation: .add),
@@ -56,14 +56,14 @@ extension ZIPFoundationTests {
         return Archive.ZIP64EndOfCentralDirectory(record: record, locator: locator)
     }
 
-    private func makeMockCentralDirectory() -> Entry.CentralDirectoryStructure? {
+    private func makeMockCentralDirectory() async -> Entry.CentralDirectoryStructure? {
         let cdsBytes: [UInt8] = [0x50, 0x4b, 0x01, 0x02, 0x1e, 0x15, 0x14, 0x00,
                                  0x08, 0x08, 0x08, 0x00, 0xab, 0x85, 0x77, 0x47,
                                  0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
                                  0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
                                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                  0xb0, 0x11, 0x00, 0x00, 0x00, 0x00]
-        guard let cds = Entry.CentralDirectoryStructure(data: Data(cdsBytes),
+        guard let cds = await Entry.CentralDirectoryStructure(data: Data(cdsBytes),
                                                         additionalDataProvider: { count -> Data in
                                                             guard let pathData = "/".data(using: .utf8) else {
                                                                 throw AdditionalDataError.encodingError

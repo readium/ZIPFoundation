@@ -17,17 +17,17 @@ import XCTest
 
 extension ZIPFoundationTests {
 
-    func testExtractUncompressedFolderEntriesFromMemory() {
-        let archive = self.memoryArchive(for: #function, mode: .read)
-        for entry in archive {
+    func testExtractUncompressedFolderEntriesFromMemory() async throws {
+        let archive = await self.memoryArchive(for: #function, mode: .read)
+        for try await entry in archive {
             do {
                 // Test extracting to memory
-                var checksum = try archive.extract(entry, bufferSize: 32, consumer: { _ in })
+                var checksum = try await archive.extract(entry, bufferSize: 32, consumer: { _ in })
                 XCTAssert(entry.checksum == checksum)
                 // Test extracting to file
                 var fileURL = self.createDirectory(for: #function)
                 fileURL.appendPathComponent(entry.path)
-                checksum = try archive.extract(entry, to: fileURL)
+                checksum = try await archive.extract(entry, to: fileURL)
                 XCTAssert(entry.checksum == checksum)
                 let fileManager = FileManager()
                 XCTAssertTrue(fileManager.fileExists(atPath: fileURL.path))
@@ -43,17 +43,17 @@ extension ZIPFoundationTests {
         XCTAssert(archive.data != nil)
     }
 
-    func testExtractCompressedFolderEntriesFromMemory() {
-        let archive = self.memoryArchive(for: #function, mode: .read)
-        for entry in archive {
+    func testExtractCompressedFolderEntriesFromMemory() async throws {
+        let archive = await self.memoryArchive(for: #function, mode: .read)
+        for try await entry in archive {
             do {
                 // Test extracting to memory
-                var checksum = try archive.extract(entry, bufferSize: 128, consumer: { _ in })
+                var checksum = try await archive.extract(entry, bufferSize: 128, consumer: { _ in })
                 XCTAssert(entry.checksum == checksum)
                 // Test extracting to file
                 var fileURL = self.createDirectory(for: #function)
                 fileURL.appendPathComponent(entry.path)
-                checksum = try archive.extract(entry, to: fileURL)
+                checksum = try await archive.extract(entry, to: fileURL)
                 XCTAssert(entry.checksum == checksum)
                 let fileManager = FileManager()
                 XCTAssertTrue(fileManager.fileExists(atPath: fileURL.path))
@@ -68,86 +68,86 @@ extension ZIPFoundationTests {
         }
     }
 
-    func testCreateArchiveAddUncompressedEntryToMemory() {
-        let archive = self.memoryArchive(for: #function, mode: .create)
+    func testCreateArchiveAddUncompressedEntryToMemory() async throws {
+        let archive = await self.memoryArchive(for: #function, mode: .create)
         let assetURL = self.resourceURL(for: #function, pathExtension: "png")
         do {
             let relativePath = assetURL.lastPathComponent
             let baseURL = assetURL.deletingLastPathComponent()
-            try archive.addEntry(with: relativePath, relativeTo: baseURL)
+            try await archive.addEntry(with: relativePath, relativeTo: baseURL)
         } catch {
             XCTFail("Failed to add entry to uncompressed folder archive with error : \(error)")
         }
-        XCTAssert(archive.checkIntegrity())
+        await archive.checkIntegrity()
     }
 
-    func testCreateArchiveAddCompressedEntryToMemory() {
-        let archive = self.memoryArchive(for: #function, mode: .create)
+    func testCreateArchiveAddCompressedEntryToMemory() async throws {
+        let archive = await self.memoryArchive(for: #function, mode: .create)
         let assetURL = self.resourceURL(for: #function, pathExtension: "png")
         do {
             let relativePath = assetURL.lastPathComponent
             let baseURL = assetURL.deletingLastPathComponent()
-            try archive.addEntry(with: relativePath, relativeTo: baseURL, compressionMethod: .deflate)
+            try await archive.addEntry(with: relativePath, relativeTo: baseURL, compressionMethod: .deflate)
         } catch {
             XCTFail("Failed to add entry to compressed folder archive with error : \(error)")
         }
-        let entry = archive[assetURL.lastPathComponent]
+        let entry = try await archive.get(assetURL.lastPathComponent)
         XCTAssertNotNil(entry)
-        XCTAssert(archive.checkIntegrity())
+        await  archive.checkIntegrity()
     }
 
-    func testUpdateArchiveRemoveUncompressedEntryFromMemory() throws {
-        let archive = self.memoryArchive(for: #function, mode: .update)
-        XCTAssert(archive.checkIntegrity())
-        guard let entryToRemove = archive["original"] else {
+    func testUpdateArchiveRemoveUncompressedEntryFromMemory() async throws {
+        let archive = await self.memoryArchive(for: #function, mode: .update)
+        await archive.checkIntegrity()
+        guard let entryToRemove = try await archive.get("original") else {
             XCTFail("Failed to find entry to remove from memory archive"); return
         }
         do {
-            try archive.remove(entryToRemove)
+            try await archive.remove(entryToRemove)
         } catch {
             XCTFail("Failed to remove entry from memory archive with error : \(error)")
         }
-        XCTAssert(archive.checkIntegrity())
+        await archive.checkIntegrity()
         // Trigger the code path that is taken if funopen() fails
         // We can only do this on Apple platforms
         #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
         let entryRemoval = {
-            self.XCTAssertSwiftError(try archive.remove(entryToRemove),
+            await self.XCTAssertSwiftError(try await archive.remove(entryToRemove),
                                      throws: Archive.ArchiveError.unreadableArchive)
         }
-        self.runWithoutMemory {
-            try? entryRemoval()
+        await self.runWithoutMemory {
+            try? await entryRemoval()
         }
         let data = Data.makeRandomData(size: 1024)
-        let emptyArchive = try Archive(accessMode: .create)
-        let replacementArchive = try Archive(data: data, accessMode: .create)
+        let emptyArchive = try await Archive(accessMode: .create)
+        let replacementArchive = try await Archive(data: data, accessMode: .create)
         // Trigger the error code path that is taken when no temporary archive
         // can be created during replacement
         replacementArchive.memoryFile = nil
         let archiveReplacement = {
-            self.XCTAssertSwiftError(try emptyArchive.replaceCurrentArchive(with: replacementArchive),
+            await self.XCTAssertSwiftError(try await emptyArchive.replaceCurrentArchive(with: replacementArchive),
                                      throws: Archive.ArchiveError.unwritableArchive)
         }
-        self.runWithoutMemory {
-            try? archiveReplacement()
+        await self.runWithoutMemory {
+            try? await archiveReplacement()
         }
         #endif
     }
 
-    func testMemoryArchiveErrorConditions() throws {
+    func testMemoryArchiveErrorConditions() async throws {
         let data = Data.makeRandomData(size: 1024)
-        XCTAssertSwiftError(try Archive(data: data, accessMode: .read),
+        await XCTAssertSwiftError(try await Archive(data: data, accessMode: .read),
                             throws: Archive.ArchiveError.missingEndOfCentralDirectoryRecord)
         // Trigger the code path that is taken if funopen() fails
         // We can only do this on Apple platforms
         #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
         let archiveCreation = {
-            self.XCTAssertSwiftError(try Archive(data: data, accessMode: .read),
+            await  self.XCTAssertSwiftError(try await Archive(data: data, accessMode: .read),
                                 throws: Archive.ArchiveError.unreadableArchive)
         }
 
-        self.runWithoutMemory {
-            try? archiveCreation()
+        await self.runWithoutMemory {
+            try? await archiveCreation()
         }
         #endif
     }
@@ -223,13 +223,13 @@ extension ZIPFoundationTests {
 extension ZIPFoundationTests {
 
     func memoryArchive(for testFunction: String, mode: Archive.AccessMode,
-                       pathEncoding: String.Encoding? = nil) -> Archive {
+                       pathEncoding: String.Encoding? = nil) async -> Archive {
         var sourceArchiveURL = ZIPFoundationTests.resourceDirectoryURL
         sourceArchiveURL.appendPathComponent(testFunction.replacingOccurrences(of: "()", with: ""))
         sourceArchiveURL.appendPathExtension("zip")
         do {
             let data = mode == .create ? Data() : try Data(contentsOf: sourceArchiveURL)
-            let archive = try Archive(data: data, accessMode: mode,
+            let archive = try await Archive(data: data, accessMode: mode,
                                   pathEncoding: pathEncoding)
             return archive
         } catch {

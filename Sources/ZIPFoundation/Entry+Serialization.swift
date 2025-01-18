@@ -40,7 +40,7 @@ extension Entry.LocalFileHeader {
         return data
     }
 
-    init?(data: Data, additionalDataProvider provider: (Int) throws -> Data) {
+    init?(data: Data, additionalDataProvider provider: (Int) async throws -> Data) async {
         guard data.count == Entry.LocalFileHeader.size else { return nil }
         guard data.scanValue(start: 0) == localFileHeaderSignature else { return nil }
         self.versionNeededToExtract = data.scanValue(start: 4)
@@ -54,7 +54,7 @@ extension Entry.LocalFileHeader {
         self.fileNameLength = data.scanValue(start: 26)
         self.extraFieldLength = data.scanValue(start: 28)
         let additionalDataLength = Int(self.fileNameLength) + Int(self.extraFieldLength)
-        guard let additionalData = try? provider(additionalDataLength) else { return nil }
+        guard let additionalData = try? await provider(additionalDataLength) else { return nil }
         guard additionalData.count == additionalDataLength else { return nil }
         var subRangeStart = 0
         var subRangeEnd = Int(self.fileNameLength)
@@ -112,7 +112,7 @@ extension Entry.CentralDirectoryStructure {
         return data
     }
 
-    init?(data: Data, additionalDataProvider provider: (Int) throws -> Data) {
+    init?(data: Data, additionalDataProvider provider: (Int) async throws -> Data) async {
         guard data.count == Entry.CentralDirectoryStructure.size else { return nil }
         guard data.scanValue(start: 0) == centralDirectorySignature else { return nil }
         self.versionMadeBy = data.scanValue(start: 4)
@@ -132,7 +132,7 @@ extension Entry.CentralDirectoryStructure {
         self.externalFileAttributes = data.scanValue(start: 38)
         self.relativeOffsetOfLocalHeader = data.scanValue(start: 42)
         let additionalDataLength = Int(self.fileNameLength) + Int(self.extraFieldLength) + Int(self.fileCommentLength)
-        guard let additionalData = try? provider(additionalDataLength) else { return nil }
+        guard let additionalData = try? await provider(additionalDataLength) else { return nil }
         guard additionalData.count == additionalDataLength else { return nil }
         var subRangeStart = 0
         var subRangeEnd = Int(self.fileNameLength)
@@ -151,7 +151,7 @@ extension Entry.CentralDirectoryStructure {
 }
 
 extension Entry.DataDescriptor {
-    init?(data: Data, additionalDataProvider provider: (Int) throws -> Data) {
+    init?(data: Data, additionalDataProvider provider: (Int) async throws -> Data) async {
         guard data.count == Self.size else { return nil }
         let signature: UInt32 = data.scanValue(start: 0)
         // The DataDescriptor signature is not mandatory so we have to re-arrange the input data if it is missing.

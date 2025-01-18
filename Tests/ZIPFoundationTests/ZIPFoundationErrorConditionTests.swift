@@ -12,9 +12,9 @@ import XCTest
 
 extension ZIPFoundationTests {
 
-    func testArchiveReadErrorConditions() {
+    func testArchiveReadErrorConditions() async throws {
         let nonExistantURL = URL(fileURLWithPath: "/nothing")
-        XCTAssertPOSIXError(try Archive(url: nonExistantURL, accessMode: .update), throwsErrorWithCode: .ENOENT)
+        await XCTAssertPOSIXError(try await Archive(url: nonExistantURL, accessMode: .update), throwsErrorWithCode: .ENOENT)
         let processInfo = ProcessInfo.processInfo
         let fileManager = FileManager()
         var result = false
@@ -24,21 +24,21 @@ extension ZIPFoundationTests {
         result = fileManager.createFile(atPath: noEndOfCentralDirectoryArchiveURL.path, contents: nil,
                                         attributes: fullPermissionAttributes)
         XCTAssert(result == true)
-        XCTAssertSwiftError(try Archive(url: noEndOfCentralDirectoryArchiveURL, accessMode: .read),
+        await XCTAssertSwiftError(try await Archive(url: noEndOfCentralDirectoryArchiveURL, accessMode: .read),
                             throws: Archive.ArchiveError.missingEndOfCentralDirectoryRecord)
-        self.runWithUnprivilegedGroup {
+        try await self.runWithUnprivilegedGroup {
             var unreadableArchiveURL = ZIPFoundationTests.tempZipDirectoryURL
             unreadableArchiveURL.appendPathComponent(processInfo.globallyUniqueString)
             let noPermissionAttributes = [FileAttributeKey.posixPermissions: NSNumber(value: Int16(0o000))]
             result = fileManager.createFile(atPath: unreadableArchiveURL.path, contents: nil,
                                                 attributes: noPermissionAttributes)
             XCTAssert(result == true)
-            XCTAssertPOSIXError(try Archive(url: unreadableArchiveURL, accessMode: .update),
+            await XCTAssertPOSIXError(try await Archive(url: unreadableArchiveURL, accessMode: .update),
                                 throwsErrorWithCode: .EACCES)
         }
     }
 
-    func testArchiveIteratorErrorConditions() throws {
+    func testArchiveIteratorErrorConditions() async throws {
         var didFailToMakeIteratorAsExpected = true
         // Construct an archive that only contains an EndOfCentralDirectoryRecord
         // with a number of entries > 0.
@@ -56,13 +56,13 @@ extension ZIPFoundationTests {
                                             contents: invalidCentralDirECDSData,
                                             attributes: nil)
         XCTAssert(result == true)
-        let invalidCentralDirArchive = try Archive(url: invalidCentralDirArchiveURL,
+        let invalidCentralDirArchive = try await Archive(url: invalidCentralDirArchiveURL,
                                                    accessMode: .read)
-        for _ in invalidCentralDirArchive {
+        for try await _ in invalidCentralDirArchive {
             didFailToMakeIteratorAsExpected = false
         }
         XCTAssertTrue(didFailToMakeIteratorAsExpected)
-        let archive = self.archive(for: #function, mode: .read)
+        let archive = await self.archive(for: #function, mode: .read)
         do {
             var invalidLocalFHArchiveURL = ZIPFoundationTests.tempZipDirectoryURL
             invalidLocalFHArchiveURL.appendPathComponent(processInfo.globallyUniqueString)
@@ -72,9 +72,9 @@ extension ZIPFoundationTests {
             // should fail.
             invalidLocalFHArchiveData[26] = 0xFF
             try invalidLocalFHArchiveData.write(to: invalidLocalFHArchiveURL)
-            let invalidLocalFHArchive = try Archive(url: invalidLocalFHArchiveURL,
+            let invalidLocalFHArchive = try await Archive(url: invalidLocalFHArchiveURL,
                                                     accessMode: .read)
-            for _ in invalidLocalFHArchive {
+            for try await _ in invalidLocalFHArchive {
                 didFailToMakeIteratorAsExpected = false
             }
         } catch {
@@ -83,12 +83,12 @@ extension ZIPFoundationTests {
         XCTAssertTrue(didFailToMakeIteratorAsExpected)
     }
 
-    func testArchiveInvalidDataErrorConditions() {
+    func testArchiveInvalidDataErrorConditions() async {
         let ecdrInvalidCommentBytes: [UInt8] = [0x50, 0x4B, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00,
                                                 0x01, 0x00, 0x01, 0x00, 0x5A, 0x00, 0x00, 0x00,
                                                 0x2A, 0x00, 0x00, 0x00, 0x00, 0x00]
         let invalidECDRCommentData = Data(ecdrInvalidCommentBytes)
-        let invalidECDRComment = Archive.EndOfCentralDirectoryRecord(data: invalidECDRCommentData,
+        let invalidECDRComment = await Archive.EndOfCentralDirectoryRecord(data: invalidECDRCommentData,
                                                                      additionalDataProvider: {_ -> Data in
                                                                         throw AdditionalDataError.invalidDataError })
         XCTAssertNil(invalidECDRComment)
@@ -96,7 +96,7 @@ extension ZIPFoundationTests {
                                                       0x01, 0x00, 0x01, 0x00, 0x5A, 0x00, 0x00, 0x00,
                                                       0x2A, 0x00, 0x00, 0x00, 0x00, 0x01]
         let invalidECDRCommentLengthData = Data(ecdrInvalidCommentLengthBytes)
-        let invalidECDRCommentLength = Archive.EndOfCentralDirectoryRecord(data: invalidECDRCommentLengthData,
+        let invalidECDRCommentLength = await Archive.EndOfCentralDirectoryRecord(data: invalidECDRCommentLengthData,
                                                                            additionalDataProvider: {_ -> Data in
                                                                             return Data() })
         XCTAssertNil(invalidECDRCommentLength)

@@ -32,7 +32,7 @@ extension FileManager {
     /// - Throws: Throws an error if the source item does not exist or the destination URL is not writable.
     public func zipItem(at sourceURL: URL, to destinationURL: URL,
                         shouldKeepParent: Bool = true, compressionMethod: CompressionMethod = .none,
-                        progress: Progress? = nil) throws {
+                        progress: Progress? = nil) async throws {
         let fileManager = FileManager()
         guard fileManager.itemExists(at: sourceURL) else {
             throw CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: sourceURL.path])
@@ -40,7 +40,7 @@ extension FileManager {
         guard !fileManager.itemExists(at: destinationURL) else {
             throw CocoaError(.fileWriteFileExists, userInfo: [NSFilePathErrorKey: destinationURL.path])
         }
-        let archive = try Archive(url: destinationURL, accessMode: .create)
+        let archive = try await Archive(url: destinationURL, accessMode: .create)
         let isDirectory = try FileManager.typeForItem(at: sourceURL) == .directory
         if isDirectory {
             var subPaths = try self.subpathsOfDirectory(atPath: sourceURL.path)
@@ -66,17 +66,17 @@ extension FileManager {
                     let itemURL = sourceURL.appendingPathComponent(entryPath)
                     let entryProgress = archive.makeProgressForAddingItem(at: itemURL)
                     progress.addChild(entryProgress, withPendingUnitCount: entryProgress.totalUnitCount)
-                    try archive.addEntry(with: finalEntryPath, relativeTo: finalBaseURL,
+                    try await archive.addEntry(with: finalEntryPath, relativeTo: finalBaseURL,
                                          compressionMethod: compressionMethod, progress: entryProgress)
                 } else {
-                    try archive.addEntry(with: finalEntryPath, relativeTo: finalBaseURL,
+                    try await archive.addEntry(with: finalEntryPath, relativeTo: finalBaseURL,
                                          compressionMethod: compressionMethod)
                 }
             }
         } else {
             progress?.totalUnitCount = archive.totalUnitCountForAddingItem(at: sourceURL)
             let baseURL = sourceURL.deletingLastPathComponent()
-            try archive.addEntry(with: sourceURL.lastPathComponent, relativeTo: baseURL,
+            try await archive.addEntry(with: sourceURL.lastPathComponent, relativeTo: baseURL,
                                  compressionMethod: compressionMethod, progress: progress)
         }
     }
@@ -93,19 +93,19 @@ extension FileManager {
     /// - Throws: Throws an error if the source item does not exist or the destination URL is not writable.
     public func unzipItem(at sourceURL: URL, to destinationURL: URL,
                           skipCRC32: Bool = false, allowUncontainedSymlinks: Bool = false,
-                          progress: Progress? = nil, pathEncoding: String.Encoding? = nil) throws {
+                          progress: Progress? = nil, pathEncoding: String.Encoding? = nil) async throws {
         let fileManager = FileManager()
         guard fileManager.itemExists(at: sourceURL) else {
             throw CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: sourceURL.path])
         }
-        let archive = try Archive(url: sourceURL, accessMode: .read, pathEncoding: pathEncoding)
+        let archive = try await Archive(url: sourceURL, accessMode: .read, pathEncoding: pathEncoding)
         var totalUnitCount = Int64(0)
         if let progress = progress {
-            totalUnitCount = archive.reduce(0, { $0 + archive.totalUnitCountForReading($1) })
+            totalUnitCount = try await archive.reduce(0, { $0 + archive.totalUnitCountForReading($1) })
             progress.totalUnitCount = totalUnitCount
         }
 
-        for entry in archive {
+        for try await entry in archive {
             let path = pathEncoding == nil ? entry.path : entry.path(using: pathEncoding!)
             let entryURL = destinationURL.appendingPathComponent(path)
             guard entryURL.isContained(in: destinationURL) else {
@@ -116,11 +116,11 @@ extension FileManager {
             if let progress = progress {
                 let entryProgress = archive.makeProgressForReading(entry)
                 progress.addChild(entryProgress, withPendingUnitCount: entryProgress.totalUnitCount)
-                crc32 = try archive.extract(entry, to: entryURL,
+                crc32 = try await archive.extract(entry, to: entryURL,
                                             skipCRC32: skipCRC32, allowUncontainedSymlinks: allowUncontainedSymlinks,
                                             progress: entryProgress)
             } else {
-                crc32 = try archive.extract(entry, to: entryURL,
+                crc32 = try await archive.extract(entry, to: entryURL,
                                             skipCRC32: skipCRC32, allowUncontainedSymlinks: allowUncontainedSymlinks)
             }
 

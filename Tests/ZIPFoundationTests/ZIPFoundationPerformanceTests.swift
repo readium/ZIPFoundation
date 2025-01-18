@@ -13,14 +13,14 @@ import XCTest
 
 extension ZIPFoundationTests {
 
-    func testPerformanceWriteUncompressed() {
-        let archive = self.archive(for: #function, mode: .create)
+    func testPerformanceWriteUncompressed() async {
+        let archive = await self.archive(for: #function, mode: .create)
         let size = 1024*1024*20
         let data = Data.makeRandomData(size: size)
         let entryName = ProcessInfo.processInfo.globallyUniqueString
-        measure {
+        await measureAsync {
             do {
-                try archive.addEntry(with: entryName, type: .file,
+                try await archive.addEntry(with: entryName, type: .file,
                                      uncompressedSize: Int64(size),
                                      compressionMethod: .none,
                                      provider: { (position, bufferSize) -> Data in
@@ -34,13 +34,13 @@ extension ZIPFoundationTests {
         }
     }
 
-    func testPerformanceReadUncompressed() {
-        let archive = self.archive(for: #function, mode: .create)
+    func testPerformanceReadUncompressed() async {
+        let archive = await self.archive(for: #function, mode: .create)
         let size = 1024*1024*20
         let data = Data.makeRandomData(size: size)
         let entryName = ProcessInfo.processInfo.globallyUniqueString
         do {
-            try archive.addEntry(with: entryName, type: .file,
+            try await archive.addEntry(with: entryName, type: .file,
                                  uncompressedSize: Int64(size),
                                  compressionMethod: .none,
                                  provider: { (position, bufferSize) -> Data in
@@ -51,27 +51,27 @@ extension ZIPFoundationTests {
         } catch {
             XCTFail("Failed to add large entry to uncompressed archive with error : \(error)")
         }
-        measure {
+        await measureAsync {
             do {
-                guard let entry = archive[entryName] else {
+                guard let entry = try await archive.get(entryName) else {
                     XCTFail("Failed to read entry.")
                     return
                 }
-                _ = try archive.extract(entry, consumer: {_ in })
+                _ = try await archive.extract(entry, consumer: {_ in })
             } catch {
                 XCTFail("Failed to read large entry from uncompressed archive")
             }
         }
     }
 
-    func testPerformanceWriteCompressed() {
-        let archive = self.archive(for: #function, mode: .create)
+    func testPerformanceWriteCompressed() async {
+        let archive = await self.archive(for: #function, mode: .create)
         let size = 1024*1024*20
         let data = Data.makeRandomData(size: size)
         let entryName = ProcessInfo.processInfo.globallyUniqueString
-        measure {
+        await measureAsync {
             do {
-                try archive.addEntry(with: entryName, type: .file,
+                try await archive.addEntry(with: entryName, type: .file,
                                      uncompressedSize: Int64(size),
                                      compressionMethod: .deflate,
                                      provider: { (position, bufferSize) -> Data in
@@ -85,13 +85,13 @@ extension ZIPFoundationTests {
         }
     }
 
-    func testPerformanceReadCompressed() {
-        let archive = self.archive(for: #function, mode: .create)
+    func testPerformanceReadCompressed() async {
+        let archive = await self.archive(for: #function, mode: .create)
         let size = 1024*1024*20
         let data = Data.makeRandomData(size: size)
         let entryName = ProcessInfo.processInfo.globallyUniqueString
         do {
-            try archive.addEntry(with: entryName, type: .file,
+            try await archive.addEntry(with: entryName, type: .file,
                                  uncompressedSize: Int64(size),
                                  compressionMethod: .deflate,
                                  provider: { (position, bufferSize) -> Data in
@@ -102,13 +102,13 @@ extension ZIPFoundationTests {
         } catch {
             XCTFail("Failed to add large entry to compressed archive with error : \(error)")
         }
-        measure {
+        await measureAsync {
             do {
-                guard let entry = archive[entryName] else {
+                guard let entry = try await archive.get(entryName) else {
                     XCTFail("Failed to read entry.")
                     return
                 }
-                _ = try archive.extract(entry, consumer: {_ in })
+                _ = try await archive.extract(entry, consumer: {_ in })
             } catch {
                 XCTFail("Failed to read large entry from compressed archive")
             }
@@ -121,5 +121,16 @@ extension ZIPFoundationTests {
         measure {
             _ = data.crc32(checksum: 0)
         }
+    }
+}
+
+extension XCTestCase {
+    func measureAsync(timeout: TimeInterval = 100, _ block: @escaping () async -> Void) async {
+        let exp = expectation(description: "Finished")
+        Task {
+            await block()
+            exp.fulfill()
+        }
+        await fulfillment(of: [exp], timeout: timeout)
     }
 }

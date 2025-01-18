@@ -8,7 +8,7 @@
 import Foundation
 
 /// A `DataSource` working with a ZIP file on the file system.
-final class FileDataSource : WritableDataSource {
+actor FileDataSource : WritableDataSource {
     
     enum AccessMode: String {
         case read = "rb"
@@ -18,7 +18,7 @@ final class FileDataSource : WritableDataSource {
     let file: FILEPointer
     var isClosed: Bool = false
     
-    convenience init(url: URL, mode: AccessMode) throws {
+    init(url: URL, mode: AccessMode) async throws {
         precondition(url.isFileURL)
         
         let fsRepr = FileManager.default.fileSystemRepresentation(withPath: url.path)
@@ -31,38 +31,34 @@ final class FileDataSource : WritableDataSource {
         setvbuf(file, nil, _IOFBF, Int(defaultPOSIXBufferSize))
         try checkNoError()
         
-        try seek(to: 0)
+        try await seek(to: 0)
     }
     
     init(file: FILEPointer) {
         self.file = file
     }
     
-    deinit {
-        try? close()
-    }
-    
-    func length() throws -> UInt64 {
-        let currentPos = try position()
+    func length() async throws -> UInt64 {
+        let currentPos = try await position()
         fseeko(file, 0, SEEK_END)
         try checkNoError()
-        let length = try position()
-        try seek(to: currentPos)
+        let length = try await position()
+        try await seek(to: currentPos)
         return length
     }
     
-    func position() throws -> UInt64 {
+    func position() async throws -> UInt64 {
         let position = ftello(file)
         try checkNoError()
         return UInt64(position)
     }
     
-    func seek(to position: UInt64) throws {
+    func seek(to position: UInt64) async throws {
         fseeko(file, off_t(position), SEEK_SET)
         try checkNoError()
     }
     
-    func read(length: Int) throws -> Data {
+    func read(length: Int) async throws -> Data {
         let alignment = MemoryLayout<UInt>.alignment
         let bytes = UnsafeMutableRawPointer.allocate(byteCount: length, alignment: alignment)
         let bytesRead = fread(bytes, 1, length, file)
@@ -74,7 +70,7 @@ final class FileDataSource : WritableDataSource {
         )
     }
     
-    func write(_ data: Data) throws {
+    func write(_ data: Data) async throws {
         try data.withUnsafeBytes { rawBufferPointer in
             if let baseAddress = rawBufferPointer.baseAddress, rawBufferPointer.count > 0 {
                 let pointer = baseAddress.assumingMemoryBound(to: UInt8.self)
@@ -84,7 +80,7 @@ final class FileDataSource : WritableDataSource {
         }
     }
 
-    func writeLargeChunk(_ data: Data, size: UInt64, bufferSize: Int) throws {
+    func writeLargeChunk(_ data: Data, size: UInt64, bufferSize: Int) async throws {
         var sizeWritten: UInt64 = 0
         try data.withUnsafeBytes { rawBufferPointer in
             if let baseAddress = rawBufferPointer.baseAddress, rawBufferPointer.count > 0 {
@@ -102,17 +98,27 @@ final class FileDataSource : WritableDataSource {
         }
     }
     
-    func truncate(to length: UInt64) throws {
+    func truncate(to length: UInt64) async throws {
         ftruncate(fileno(file), off_t(length))
         try checkNoError()
     }
     
-    func flush() throws {
+    func flush() async throws {
         fflush(file)
         try checkNoError()
     }
     
-    func close() throws {
+    nonisolated func close() {
+        Task {
+            do {
+                try await close()
+            } catch {
+                print(error)
+            }
+        }
+    }
+    
+    private func close() async throws {
         guard !isClosed else {
             return
         }

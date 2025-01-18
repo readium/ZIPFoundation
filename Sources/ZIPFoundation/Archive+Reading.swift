@@ -24,7 +24,7 @@ extension Archive {
     /// - Throws: An error if the destination file cannot be written or the entry contains malformed content.
     public func extract(_ entry: Entry, to url: URL, bufferSize: Int = defaultReadChunkSize,
                         skipCRC32: Bool = false, allowUncontainedSymlinks: Bool = false,
-                        progress: Progress? = nil) throws -> CRC32 {
+                        progress: Progress? = nil) async throws -> CRC32 {
         guard bufferSize > 0 else {
             throw ArchiveError.invalidBufferSize
         }
@@ -42,13 +42,13 @@ extension Archive {
             }
             defer { fclose(destinationFile) }
             let consumer = { _ = try Data.write(chunk: $0, to: destinationFile) }
-            checksum = try self.extract(entry, bufferSize: bufferSize, skipCRC32: skipCRC32,
+            checksum = try await self.extract(entry, bufferSize: bufferSize, skipCRC32: skipCRC32,
                                         progress: progress, consumer: consumer)
         case .directory:
             let consumer = { (_: Data) in
                 try fileManager.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
             }
-            checksum = try self.extract(entry, bufferSize: bufferSize, skipCRC32: skipCRC32,
+            checksum = try await self.extract(entry, bufferSize: bufferSize, skipCRC32: skipCRC32,
                                         progress: progress, consumer: consumer)
         case .symlink:
             guard fileManager.itemExists(at: url) == false else {
@@ -66,7 +66,7 @@ extension Archive {
                 try fileManager.createParentDirectoryStructure(for: url)
                 try fileManager.createSymbolicLink(atPath: url.path, withDestinationPath: linkPath)
             }
-            checksum = try self.extract(entry, bufferSize: bufferSize, skipCRC32: skipCRC32,
+            checksum = try await self.extract(entry, bufferSize: bufferSize, skipCRC32: skipCRC32,
                                         progress: progress, consumer: consumer)
         }
         try fileManager.transferAttributes(from: entry, toItemAtURL: url)
@@ -84,14 +84,14 @@ extension Archive {
     /// - Returns: The checksum of the processed content or 0 if the `skipCRC32` flag was set to `true`..
     /// - Throws: An error if the destination file cannot be written or the entry contains malformed content.
     public func extract(_ entry: Entry, bufferSize: Int = defaultReadChunkSize, skipCRC32: Bool = false,
-                        progress: Progress? = nil, consumer: Consumer) throws -> CRC32 {
+                        progress: Progress? = nil, consumer: Consumer) async throws -> CRC32 {
         guard bufferSize > 0 else {
             throw ArchiveError.invalidBufferSize
         }
         var checksum = CRC32(0)
         let localFileHeader = entry.localFileHeader
         guard entry.dataOffset <= .max else { throw ArchiveError.invalidLocalHeaderDataOffset }
-        try dataSource.seek(to: entry.dataOffset)
+        try await dataSource.seek(to: entry.dataOffset)
         progress?.totalUnitCount = self.totalUnitCountForReading(entry)
         switch entry.type {
         case .file:
@@ -99,20 +99,20 @@ extension Archive {
                 throw ArchiveError.invalidCompressionMethod
             }
             switch compressionMethod {
-            case .none: checksum = try self.readUncompressed(entry: entry, bufferSize: bufferSize,
+            case .none: checksum = try await self.readUncompressed(entry: entry, bufferSize: bufferSize,
                                                              skipCRC32: skipCRC32, progress: progress, with: consumer)
-            case .deflate: checksum = try self.readCompressed(entry: entry, bufferSize: bufferSize,
+            case .deflate: checksum = try await self.readCompressed(entry: entry, bufferSize: bufferSize,
                                                               skipCRC32: skipCRC32, progress: progress, with: consumer)
             }
         case .directory:
-            try consumer(Data())
+            try await consumer(Data())
             progress?.completedUnitCount = self.totalUnitCountForReading(entry)
         case .symlink:
             let localFileHeader = entry.localFileHeader
             let size = Int(localFileHeader.compressedSize)
-            let data = try dataSource.read(length: size)
+            let data = try await dataSource.read(length: size)
             checksum = data.crc32(checksum: 0)
-            try consumer(data)
+            try await consumer(data)
             progress?.completedUnitCount = self.totalUnitCountForReading(entry)
         }
         return checksum
@@ -131,7 +131,7 @@ extension Archive {
         of entry: Entry,
         bufferSize: Int = defaultReadChunkSize,
         consumer: Consumer
-    ) throws {
+    ) async throws {
         guard entry.type == .file else {
             throw ArchiveError.entryIsNotAFile
         }
@@ -152,10 +152,10 @@ extension Archive {
         
         switch compressionMethod {
         case .none:
-            try extractStoredRange(range, of: entry, bufferSize: bufferSize, consumer: consumer)
+            try await extractStoredRange(range, of: entry, bufferSize: bufferSize, consumer: consumer)
             
         case .deflate:
-            try extractCompressedRange(range, of: entry, bufferSize: bufferSize, consumer: consumer)
+            try await extractCompressedRange(range, of: entry, bufferSize: bufferSize, consumer: consumer)
         }
     }
     
@@ -166,15 +166,15 @@ extension Archive {
         of entry: Entry,
         bufferSize: Int,
         consumer: Consumer
-    ) throws {
-        try dataSource.seek(to: entry.dataOffset + range.lowerBound)
+    ) async throws {
+        try await dataSource.seek(to: entry.dataOffset + range.lowerBound)
         
-        _ = try Data.consumePart(
+        _ = try await Data.consumePart(
             of: Int64(range.count),
             chunkSize: bufferSize,
             skipCRC32: true,
             provider: { pos, chunkSize -> Data in
-                try dataSource.read(length: chunkSize)
+                try await dataSource.read(length: chunkSize)
             },
             consumer: consumer
         )
@@ -187,13 +187,13 @@ extension Archive {
         of entry: Entry,
         bufferSize: Int,
         consumer: Consumer
-    ) throws {
+    ) async throws {
         var bytesRead: UInt64 = 0
         
         do {
-            try dataSource.seek(to: entry.dataOffset)
+            try await dataSource.seek(to: entry.dataOffset)
             
-            _ = try readCompressed(
+            _ = try await readCompressed(
                 entry: entry,
                 bufferSize: bufferSize,
                 skipCRC32: true
@@ -203,15 +203,15 @@ extension Archive {
                 if bytesRead >= range.lowerBound {
                     if bytesRead + chunkSize > range.upperBound {
                         let remainingBytes = range.upperBound - bytesRead
-                        try consumer(chunk[..<remainingBytes])
+                        try await consumer(chunk[..<remainingBytes])
                     } else {
-                        try consumer(chunk)
+                        try await consumer(chunk)
                     }
                 } else if bytesRead + chunkSize > range.lowerBound {
                     // Calculate the overlap and pass the relevant portion of the chunk
                     let start = range.lowerBound - bytesRead
                     let end = Swift.min(chunkSize, range.upperBound - bytesRead)
-                    try consumer(chunk[start..<end])
+                    try await consumer(chunk[start..<end])
                 }
                 
                 bytesRead += chunkSize

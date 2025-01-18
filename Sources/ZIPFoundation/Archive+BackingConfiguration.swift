@@ -40,21 +40,11 @@ extension Archive {
         #endif
     }
     
-    static func makeBackingConfiguration(for url: URL, mode: AccessMode) throws -> BackingConfiguration {
-        if url.isHTTPURL {
-            precondition(mode == .read)
-            let dataSource = try HTTPDataSource(url: url)
-            return try makeBackingConfiguration(for: dataSource)
-        }
-        
-        return try makeFileBackingConfiguration(for: url, mode: mode)
-    }
-
-    static func makeFileBackingConfiguration(for url: URL, mode: AccessMode) throws -> BackingConfiguration {
+    static func makeBackingConfiguration(for url: URL, mode: AccessMode) async throws -> BackingConfiguration {
         let dataSource: DataSource
         switch mode {
         case .read:
-            dataSource = try FileDataSource(url: url, mode: .read)
+            dataSource = try await FileDataSource(url: url, mode: .read)
         case .create:
             let endOfCentralDirectoryRecord = EndOfCentralDirectoryRecord(
                 numberOfDisk: 0, numberOfDiskStart: 0,
@@ -68,17 +58,17 @@ extension Archive {
             try endOfCentralDirectoryRecord.data.write(to: url, options: .withoutOverwriting)
             fallthrough
         case .update:
-            dataSource = try FileDataSource(url: url, mode: .write)
+            dataSource = try await FileDataSource(url: url, mode: .write)
         }
         
-        return try makeBackingConfiguration(for: dataSource)
+        return try await makeBackingConfiguration(for: dataSource)
     }
     
-    static func makeBackingConfiguration(for dataSource: DataSource) throws -> BackingConfiguration {
-        guard let (eocdRecord, zip64EOCD) = try Archive.scanForEndOfCentralDirectoryRecord(in: dataSource) else {
+    static func makeBackingConfiguration(for dataSource: DataSource) async throws -> BackingConfiguration {
+        guard let (eocdRecord, zip64EOCD) = try await Archive.scanForEndOfCentralDirectoryRecord(in: dataSource) else {
             throw ArchiveError.missingEndOfCentralDirectoryRecord
         }
-        try dataSource.seek(to: 0)
+        try await dataSource.seek(to: 0)
         
         return BackingConfiguration(
             dataSource: dataSource,
@@ -88,7 +78,7 @@ extension Archive {
     }
 
     #if swift(>=5.0)
-    static func makeBackingConfiguration(for data: Data, mode: AccessMode) throws
+    static func makeBackingConfiguration(for data: Data, mode: AccessMode) async throws
     -> BackingConfiguration {
         let posixMode: String
         switch mode {
@@ -111,14 +101,14 @@ extension Archive {
                                                                           offsetToStartOfCentralDirectory: 0,
                                                                           zipFileCommentLength: 0,
                                                                           zipFileCommentData: Data())
-            try dataSource.write(endOfCentralDirectoryRecord.data)
+            try await dataSource.write(endOfCentralDirectoryRecord.data)
         }
         
-        guard let (eocdRecord, zip64EOCD) = try Archive.scanForEndOfCentralDirectoryRecord(in: dataSource) else {
+        guard let (eocdRecord, zip64EOCD) = try await Archive.scanForEndOfCentralDirectoryRecord(in: dataSource) else {
             throw ArchiveError.missingEndOfCentralDirectoryRecord
         }
 
-        try dataSource.seek(to: 0)
+        try await dataSource.seek(to: 0)
         return BackingConfiguration(dataSource: dataSource,
                                     endOfCentralDirectoryRecord: eocdRecord,
                                     zip64EndOfCentralDirectory: zip64EOCD,

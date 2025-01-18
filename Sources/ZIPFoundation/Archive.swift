@@ -53,7 +53,7 @@ let memoryURLScheme = "memory"
 ///     var archiveURL = URL(fileURLWithPath: "/path/file.zip")
 ///     var archive = Archive(url: archiveURL, accessMode: .update)
 ///     try archive?.addEntry("test.txt", relativeTo: baseURL, compressionMethod: .deflate)
-public final class Archive: Sequence {
+public final class Archive: AsyncSequence {
 
     typealias LocalFileHeader = Entry.LocalFileHeader
     typealias DataDescriptor = Entry.DefaultDataDescriptor
@@ -172,21 +172,21 @@ public final class Archive: Sequence {
     ///   - The file URL _must_ point to an existing file for `AccessMode.read`.
     ///   - The file URL _must_ point to a non-existing file for `AccessMode.create`.
     ///   - The file URL _must_ point to an existing file for `AccessMode.update`.
-    public init(url: URL, accessMode mode: AccessMode, pathEncoding: String.Encoding? = nil) throws {
+    public init(url: URL, accessMode mode: AccessMode, pathEncoding: String.Encoding? = nil) async throws {
         self.url = url
         self.accessMode = mode
         self.pathEncoding = pathEncoding
-        let config = try Archive.makeBackingConfiguration(for: url, mode: mode)
+        let config = try await Archive.makeBackingConfiguration(for: url, mode: mode)
         self.dataSource = config.dataSource
         self.endOfCentralDirectoryRecord = config.endOfCentralDirectoryRecord
         self.zip64EndOfCentralDirectory = config.zip64EndOfCentralDirectory
     }
 
-    public init(url: URL?, dataSource: DataSource, pathEncoding: String.Encoding? = nil) throws {
+    public init(url: URL?, dataSource: DataSource, pathEncoding: String.Encoding? = nil) async throws {
         self.url = url
         self.accessMode = .read
         self.pathEncoding = pathEncoding
-        let config = try Archive.makeBackingConfiguration(for: dataSource)
+        let config = try await Archive.makeBackingConfiguration(for: dataSource)
         self.dataSource = config.dataSource
         self.endOfCentralDirectoryRecord = config.endOfCentralDirectoryRecord
         self.zip64EndOfCentralDirectory = config.zip64EndOfCentralDirectory
@@ -209,7 +209,7 @@ public final class Archive: Sequence {
     /// - Note:
     ///   - The backing `data` _must_ contain a valid ZIP archive for `AccessMode.read` and `AccessMode.update`.
     ///   - The backing `data` _must_ be empty (or omitted) for `AccessMode.create`.
-    public init(data: Data = Data(), accessMode mode: AccessMode, pathEncoding: String.Encoding? = nil) throws {
+    public init(data: Data = Data(), accessMode mode: AccessMode, pathEncoding: String.Encoding? = nil) async throws {
         guard let url = URL(string: "\(memoryURLScheme)://") else {
             throw ArchiveError.unreadableArchive
         }
@@ -217,26 +217,50 @@ public final class Archive: Sequence {
         self.url = url
         self.accessMode = mode
         self.pathEncoding = pathEncoding
-        let config = try Archive.makeBackingConfiguration(for: data, mode: mode)
+        let config = try await Archive.makeBackingConfiguration(for: data, mode: mode)
         self.dataSource = config.dataSource
         self.memoryFile = config.memoryFile
         self.endOfCentralDirectoryRecord = config.endOfCentralDirectoryRecord
         self.zip64EndOfCentralDirectory = config.zip64EndOfCentralDirectory
     }
 #endif
+    
+    deinit {
+        try? dataSource.close()
+    }
 
-    public func makeIterator() -> AnyIterator<Entry> {
-        let totalNumberOfEntriesInCD = self.totalNumberOfEntriesInCentralDirectory
-        var directoryIndex = self.offsetToStartOfCentralDirectory
-        var index = 0
-        return AnyIterator { [self] in
+    public func makeAsyncIterator() -> Iterator {
+        Iterator(
+            dataSource: dataSource,
+            totalNumberOfEntriesInCD: totalNumberOfEntriesInCentralDirectory,
+            directoryIndex: offsetToStartOfCentralDirectory
+        )
+    }
+    
+    public struct Iterator: AsyncIteratorProtocol {
+        private let dataSource: DataSource
+        private let totalNumberOfEntriesInCD: UInt64
+        private var directoryIndex: UInt64
+        private var index = 0
+        
+        fileprivate init(
+            dataSource: DataSource,
+            totalNumberOfEntriesInCD: UInt64,
+            directoryIndex: UInt64
+        ) {
+            self.dataSource = dataSource
+            self.totalNumberOfEntriesInCD = totalNumberOfEntriesInCD
+            self.directoryIndex = directoryIndex
+        }
+        
+        public mutating func next() async throws -> Entry? {
             guard index < totalNumberOfEntriesInCD else { return nil }
             do {
-                guard let centralDirStruct: CentralDirectoryStructure = try dataSource.readStruct(at: directoryIndex) else {
+                guard let centralDirStruct: CentralDirectoryStructure = try await dataSource.readStruct(at: directoryIndex) else {
                     return nil
                 }
                 let offset = UInt64(centralDirStruct.effectiveRelativeOffsetOfLocalHeader)
-                guard let localFileHeader: LocalFileHeader = try dataSource.readStruct(at: offset) else { return nil }
+                guard let localFileHeader: LocalFileHeader = try await dataSource.readStruct(at: offset) else { return nil }
                 var dataDescriptor: DataDescriptor?
                 var zip64DataDescriptor: ZIP64DataDescriptor?
                 if centralDirStruct.usesDataDescriptor {
@@ -247,9 +271,9 @@ public final class Archive: Sequence {
                     : centralDirStruct.effectiveUncompressedSize
                     let descriptorPosition = offset + UInt64(LocalFileHeader.size) + additionalSize + dataSize
                     if centralDirStruct.isZIP64 {
-                        zip64DataDescriptor = try dataSource.readStruct(at: descriptorPosition)
+                        zip64DataDescriptor = try await dataSource.readStruct(at: descriptorPosition)
                     } else {
-                        dataDescriptor = try dataSource.readStruct(at: descriptorPosition)
+                        dataDescriptor = try await dataSource.readStruct(at: descriptorPosition)
                     }
                 }
                 defer {
@@ -275,29 +299,29 @@ public final class Archive: Sequence {
     ///
     /// - Parameter path: A relative file path identifying the corresponding `Entry`.
     /// - Returns: An `Entry` with the given `path`. Otherwise, `nil`.
-    public subscript(path: String) -> Entry? {
+    public func get(_ path: String) async throws -> Entry? {
         if let encoding = self.pathEncoding {
-            return self.first { $0.path(using: encoding) == path }
+            return try await self.first { $0.path(using: encoding) == path }
         }
-        return self.first { $0.path == path }
+        return try await self.first { $0.path == path }
     }
 
     // MARK: - Helpers
 
     static func scanForEndOfCentralDirectoryRecord(in dataSource: DataSource)
-    throws -> EndOfCentralDirectoryStructure? {
+    async throws -> EndOfCentralDirectoryStructure? {
         var eocdOffset: UInt64 = 0
         var index = minEndOfCentralDirectoryOffset
-        let archiveLength = try dataSource.length()
+        let archiveLength = try await dataSource.length()
         while eocdOffset == 0 && index <= archiveLength {
-            try dataSource.seek(to: archiveLength - index)
-            let potentialDirectoryEndTag = try dataSource.readInt()
+            try await dataSource.seek(to: archiveLength - index)
+            let potentialDirectoryEndTag = try await dataSource.readInt()
             if potentialDirectoryEndTag == UInt32(endOfCentralDirectoryStructSignature) {
                 eocdOffset = UInt64(archiveLength - index)
-                guard let eocd: EndOfCentralDirectoryRecord = try dataSource.readStruct(at: eocdOffset) else {
+                guard let eocd: EndOfCentralDirectoryRecord = try await dataSource.readStruct(at: eocdOffset) else {
                     return nil
                 }
-                let zip64EOCD = try scanForZIP64EndOfCentralDirectory(in: dataSource, eocdOffset: eocdOffset)
+                let zip64EOCD = try await scanForZIP64EndOfCentralDirectory(in: dataSource, eocdOffset: eocdOffset)
                 return (eocd, zip64EOCD)
             }
             index += 1
@@ -306,7 +330,7 @@ public final class Archive: Sequence {
     }
 
     private static func scanForZIP64EndOfCentralDirectory(in dataSource: DataSource, eocdOffset: UInt64)
-    throws -> ZIP64EndOfCentralDirectory? {
+    async throws -> ZIP64EndOfCentralDirectory? {
         guard UInt64(ZIP64EndOfCentralDirectoryLocator.size) < eocdOffset else {
             return nil
         }
@@ -316,8 +340,8 @@ public final class Archive: Sequence {
             return nil
         }
         let recordOffset = locatorOffset - UInt64(ZIP64EndOfCentralDirectoryRecord.size)
-        guard let locator: ZIP64EndOfCentralDirectoryLocator = try dataSource.readStruct(at: locatorOffset),
-              let record: ZIP64EndOfCentralDirectoryRecord = try dataSource.readStruct(at: recordOffset) else {
+        guard let locator: ZIP64EndOfCentralDirectoryLocator = try await dataSource.readStruct(at: locatorOffset),
+              let record: ZIP64EndOfCentralDirectoryRecord = try await dataSource.readStruct(at: recordOffset) else {
             return nil
         }
         return ZIP64EndOfCentralDirectory(record: record, locator: locator)
@@ -348,7 +372,7 @@ extension Archive.EndOfCentralDirectoryRecord {
         return data
     }
 
-    init?(data: Data, additionalDataProvider provider: (Int) throws -> Data) {
+    init?(data: Data, additionalDataProvider provider: (Int) async throws -> Data) async {
         guard data.count == Archive.EndOfCentralDirectoryRecord.size else { return nil }
         guard data.scanValue(start: 0) == endOfCentralDirectorySignature else { return nil }
         self.numberOfDisk = data.scanValue(start: 4)
@@ -358,7 +382,7 @@ extension Archive.EndOfCentralDirectoryRecord {
         self.sizeOfCentralDirectory = data.scanValue(start: 12)
         self.offsetToStartOfCentralDirectory = data.scanValue(start: 16)
         self.zipFileCommentLength = data.scanValue(start: 20)
-        guard let commentData = try? provider(Int(self.zipFileCommentLength)) else { return nil }
+        guard let commentData = try? await provider(Int(self.zipFileCommentLength)) else { return nil }
         guard commentData.count == Int(self.zipFileCommentLength) else { return nil }
         self.zipFileCommentData = commentData
     }

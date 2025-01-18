@@ -13,7 +13,7 @@ import XCTest
 
 extension ZIPFoundationTests {
 
-    func testReadStructureErrorConditions() {
+    func testReadStructureErrorConditions() async {
         let processInfo = ProcessInfo.processInfo
         let fileManager = FileManager()
         var fileURL = ZIPFoundationTests.tempZipDirectoryURL
@@ -26,11 +26,11 @@ extension ZIPFoundationTests {
         // Close the file to exercise the error path during readStructure that deals with
         // unreadable file data.
         fclose(file)
-        let centralDirectoryStructure: Entry.CentralDirectoryStructure? = Data.readStruct(from: file, at: 0)
+        let centralDirectoryStructure: Entry.CentralDirectoryStructure? = await Data.readStruct(from: file, at: 0)
         XCTAssertNil(centralDirectoryStructure)
     }
 
-    func testReadChunkErrorConditions() {
+    func testReadChunkErrorConditions() async {
         let processInfo = ProcessInfo.processInfo
         let fileManager = FileManager()
         var fileURL = ZIPFoundationTests.tempZipDirectoryURL
@@ -43,11 +43,11 @@ extension ZIPFoundationTests {
         // Close the file to exercise the error path during readChunk that deals with
         // unreadable file data.
         fclose(file)
-        XCTAssertSwiftError(try Data.readChunk(of: 10, from: file),
+        await XCTAssertSwiftError(try Data.readChunk(of: 10, from: file),
                             throws: Data.DataError.unreadableFile)
     }
 
-    func testWriteChunkErrorConditions() {
+    func testWriteChunkErrorConditions() async {
         let processInfo = ProcessInfo.processInfo
         let fileManager = FileManager()
         var fileURL = ZIPFoundationTests.tempZipDirectoryURL
@@ -60,7 +60,7 @@ extension ZIPFoundationTests {
         // Close the file to exercise the error path during writeChunk that deals with
         // unwritable files.
         fclose(file)
-        XCTAssertSwiftError(try Data.write(chunk: Data(count: 10), to: file),
+        await XCTAssertSwiftError(try Data.write(chunk: Data(count: 10), to: file),
                             throws: Data.DataError.unwritableFile)
     }
 
@@ -95,7 +95,7 @@ extension ZIPFoundationTests {
         }
     }
 
-    func testWriteLargeChunkErrorConditions() {
+    func testWriteLargeChunkErrorConditions() async {
         let processInfo = ProcessInfo.processInfo
         let fileManager = FileManager()
         var fileURL = ZIPFoundationTests.tempZipDirectoryURL
@@ -109,7 +109,7 @@ extension ZIPFoundationTests {
         // Close the file to exercise the error path during writeChunk that deals with
         // unwritable files.
         fclose(file)
-        XCTAssertSwiftError(try Data.writeLargeChunk(data, size: 1024, bufferSize: 256, to: file),
+        await XCTAssertSwiftError(try Data.writeLargeChunk(data, size: 1024, bufferSize: 256, to: file),
                             throws: Data.DataError.unwritableFile)
     }
 }
