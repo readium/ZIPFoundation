@@ -22,9 +22,10 @@ extension Archive {
     ///   - progress: A progress object that can be used to track or cancel the extract operation.
     /// - Returns: The checksum of the processed content or 0 if the `skipCRC32` flag was set to `true`.
     /// - Throws: An error if the destination file cannot be written or the entry contains malformed content.
-    public func extract(_ entry: Entry, to url: URL, bufferSize: Int = defaultReadChunkSize,
+    public func extract(_ entry: Entry, to url: URL, bufferSize: Int? = nil,
                         skipCRC32: Bool = false, allowUncontainedSymlinks: Bool = false,
                         progress: Progress? = nil) async throws -> CRC32 {
+        let bufferSize = bufferSize ?? readChunkSize
         guard bufferSize > 0 else {
             throw ArchiveError.invalidBufferSize
         }
@@ -83,8 +84,9 @@ extension Archive {
     ///   - consumer: A closure that consumes contents of `Entry` as `Data` chunks.
     /// - Returns: The checksum of the processed content or 0 if the `skipCRC32` flag was set to `true`..
     /// - Throws: An error if the destination file cannot be written or the entry contains malformed content.
-    public func extract(_ entry: Entry, bufferSize: Int = defaultReadChunkSize, skipCRC32: Bool = false,
+    public func extract(_ entry: Entry, bufferSize: Int? = nil, skipCRC32: Bool = false,
                         progress: Progress? = nil, consumer: Consumer) async throws -> CRC32 {
+        let bufferSize = bufferSize ?? readChunkSize
         guard bufferSize > 0 else {
             throw ArchiveError.invalidBufferSize
         }
@@ -129,9 +131,10 @@ extension Archive {
     public func extractRange(
         _ range: Range<UInt64>,
         of entry: Entry,
-        bufferSize: Int = defaultReadChunkSize,
+        bufferSize: Int? = nil,
         consumer: Consumer
     ) async throws {
+        let bufferSize = bufferSize ?? readChunkSize
         guard entry.type == .file else {
             throw ArchiveError.entryIsNotAFile
         }
