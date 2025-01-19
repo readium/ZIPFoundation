@@ -133,6 +133,9 @@ public final class Archive: AsyncSequence {
     public let url: URL?
     /// Access mode for an archive file.
     public let accessMode: AccessMode
+    
+    let readChunkSize: Int
+    
     var dataSource: DataSource
     var endOfCentralDirectoryRecord: EndOfCentralDirectoryRecord
     var zip64EndOfCentralDirectory: ZIP64EndOfCentralDirectory?
@@ -172,22 +175,24 @@ public final class Archive: AsyncSequence {
     ///   - The file URL _must_ point to an existing file for `AccessMode.read`.
     ///   - The file URL _must_ point to a non-existing file for `AccessMode.create`.
     ///   - The file URL _must_ point to an existing file for `AccessMode.update`.
-    public init(url: URL, accessMode mode: AccessMode, pathEncoding: String.Encoding? = nil) async throws {
+    public init(url: URL, accessMode mode: AccessMode, defaultReadChunkSize: Int = defaultReadChunkSize, pathEncoding: String.Encoding? = nil) async throws {
         self.url = url
         self.accessMode = mode
         self.pathEncoding = pathEncoding
         let config = try await Archive.makeBackingConfiguration(for: url, mode: mode)
         self.dataSource = config.dataSource
+        self.readChunkSize = defaultReadChunkSize
         self.endOfCentralDirectoryRecord = config.endOfCentralDirectoryRecord
         self.zip64EndOfCentralDirectory = config.zip64EndOfCentralDirectory
     }
 
-    public init(url: URL?, dataSource: DataSource, pathEncoding: String.Encoding? = nil) async throws {
+    public init(url: URL?, dataSource: DataSource, defaultReadChunkSize: Int = defaultReadChunkSize, pathEncoding: String.Encoding? = nil) async throws {
         self.url = url
         self.accessMode = .read
         self.pathEncoding = pathEncoding
         let config = try await Archive.makeBackingConfiguration(for: dataSource)
         self.dataSource = config.dataSource
+        self.readChunkSize = defaultReadChunkSize
         self.endOfCentralDirectoryRecord = config.endOfCentralDirectoryRecord
         self.zip64EndOfCentralDirectory = config.zip64EndOfCentralDirectory
     }
@@ -219,6 +224,7 @@ public final class Archive: AsyncSequence {
         self.pathEncoding = pathEncoding
         let config = try await Archive.makeBackingConfiguration(for: data, mode: mode)
         self.dataSource = config.dataSource
+        self.readChunkSize = defaultReadChunkSize
         self.memoryFile = config.memoryFile
         self.endOfCentralDirectoryRecord = config.endOfCentralDirectoryRecord
         self.zip64EndOfCentralDirectory = config.zip64EndOfCentralDirectory
