@@ -154,15 +154,6 @@ class ZIPFoundationTests: XCTestCase {
         try handler()
     }
 
-    func runWithoutMemory(handler: () -> Void) {
-        #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
-        let systemAllocator = CFAllocatorGetDefault().takeUnretainedValue()
-        CFAllocatorSetDefault(kCFAllocatorNull)
-        defer { CFAllocatorSetDefault(systemAllocator) }
-        handler()
-        #endif
-    }
-
     // MARK: - ZIP64 Helpers
 
     // It's not practical to create compressed files that exceed the size limit every time for test,
@@ -260,7 +251,9 @@ extension ZIPFoundationTests {
             ("testUnzipItemErrorConditions", testUnzipItemErrorConditions),
             ("testUnzipUncontainedSymlink", testUnzipUncontainedSymlink),
             ("testZipItem", testZipItem),
-            ("testLinuxTestSuiteIncludesAllTests", testLinuxTestSuiteIncludesAllTests)
+            ("testLinuxTestSuiteIncludesAllTests", testLinuxTestSuiteIncludesAllTests),
+            ("testFileModificationDate", testFileModificationDate),
+            ("testFileModificationDateHelperMethods", testFileModificationDateHelperMethods)
         ] + zip64Tests + darwinOnlyTests + swift5OnlyTests
     }
 
@@ -303,8 +296,6 @@ extension ZIPFoundationTests {
     static var darwinOnlyTests: [(String, (ZIPFoundationTests) -> () throws -> Void)] {
         #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
         return [
-            ("testFileModificationDate", testFileModificationDate),
-            ("testFileModificationDateHelperMethods", testFileModificationDateHelperMethods),
             ("testZipItemProgress", testZipItemProgress),
             ("testUnzipItemProgress", testUnzipItemProgress),
             ("testConsistentBehaviorWithSystemZIPUtilities", testConsistentBehaviorWithSystemZIPUtilities),
@@ -334,7 +325,6 @@ extension ZIPFoundationTests {
     static var swift5OnlyTests: [(String, (ZIPFoundationTests) -> () throws -> Void)] {
         #if swift(>=5.0)
         return [
-            ("testAppendFile", testAppendFile),
             ("testCreateArchiveAddUncompressedEntryToMemory", testCreateArchiveAddUncompressedEntryToMemory),
             ("testCreateArchiveAddCompressedEntryToMemory", testCreateArchiveAddCompressedEntryToMemory),
             ("testUpdateArchiveRemoveUncompressedEntryFromMemory", testUpdateArchiveRemoveUncompressedEntryFromMemory),
@@ -379,6 +369,7 @@ extension Data {
 
 #if os(macOS)
 extension NSUserScriptTask {
+
     static func makeVolumeCreationTask(at tempDir: URL, volumeName: String) throws -> NSUserScriptTask {
         let scriptURL = tempDir.appendingPathComponent("createVol.sh", isDirectory: false)
         let dmgURL = tempDir.appendingPathComponent(volumeName).appendingPathExtension("dmg")
