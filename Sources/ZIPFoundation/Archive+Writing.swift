@@ -224,36 +224,22 @@ extension Archive {
 
     func replaceCurrentArchive(with archive: Archive) async throws {
         guard let url = self.url, let archiveURL = archive.url else { throw ArchiveError.unwritableArchive }
-
+        
         try dataSource.close()
         
-        if self.isMemoryArchive {
-            #if swift(>=5.0)
-            guard let data = archive.data else {
-                throw ArchiveError.unwritableArchive
-            }
-
-            let config = try await Archive.makeBackingConfiguration(for: data, mode: .update)
-            self.dataSource = config.dataSource
-            self.memoryFile = config.memoryFile
-            self.endOfCentralDirectoryRecord = config.endOfCentralDirectoryRecord
-            self.zip64EndOfCentralDirectory = config.zip64EndOfCentralDirectory
-            #endif
-        } else {
-            let fileManager = FileManager()
-            #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
-            do {
-                _ = try fileManager.replaceItemAt(url, withItemAt: archiveURL)
-            } catch {
-                _ = try fileManager.removeItem(at: url)
-                _ = try fileManager.moveItem(at: archiveURL, to: url)
-            }
-            #else
+        let fileManager = FileManager()
+#if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
+        do {
+            _ = try fileManager.replaceItemAt(url, withItemAt: archiveURL)
+        } catch {
             _ = try fileManager.removeItem(at: url)
             _ = try fileManager.moveItem(at: archiveURL, to: url)
-            #endif
-            self.dataSource = try await FileDataSource(url: url, mode: .write)
         }
+#else
+        _ = try fileManager.removeItem(at: url)
+        _ = try fileManager.moveItem(at: archiveURL, to: url)
+#endif
+        self.dataSource = try await FileDataSource(url: url, mode: .write)
     }
 }
 
@@ -290,23 +276,14 @@ private extension Archive {
     func makeTempArchive() async throws -> (Archive, URL?) {
         var archive: Archive
         var url: URL?
-        if self.isMemoryArchive {
-            #if swift(>=5.0)
-            archive = try await Archive(data: Data(), accessMode: .create,
-                                  pathEncoding: self.pathEncoding)
-            #else
-            fatalError("Memory archives are unsupported.")
-            #endif
-        } else {
-            let manager = FileManager()
-            let tempDir = URL.temporaryReplacementDirectoryURL(for: self)
-            let uniqueString = ProcessInfo.processInfo.globallyUniqueString
-            let tempArchiveURL = tempDir.appendingPathComponent(uniqueString)
-            try manager.createParentDirectoryStructure(for: tempArchiveURL)
-            let tempArchive = try await Archive(url: tempArchiveURL, accessMode: .create)
-            archive = tempArchive
-            url = tempDir
-        }
+        let manager = FileManager()
+        let tempDir = URL.temporaryReplacementDirectoryURL(for: self)
+        let uniqueString = ProcessInfo.processInfo.globallyUniqueString
+        let tempArchiveURL = tempDir.appendingPathComponent(uniqueString)
+        try manager.createParentDirectoryStructure(for: tempArchiveURL)
+        let tempArchive = try await Archive(url: tempArchiveURL, accessMode: .create)
+        archive = tempArchive
+        url = tempDir
         return (archive, url)
     }
 }

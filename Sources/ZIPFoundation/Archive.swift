@@ -25,7 +25,6 @@ let endOfCentralDirectoryStructSignature = 0x06054b50
 let localFileHeaderStructSignature = 0x04034b50
 let dataDescriptorStructSignature = 0x08074b50
 let centralDirectoryStructSignature = 0x02014b50
-let memoryURLScheme = "memory"
 
 /// A sequence of uncompressed or compressed ZIP entries.
 ///
@@ -199,40 +198,6 @@ public final class Archive: AsyncSequence {
         self.zip64EndOfCentralDirectory = config.zip64EndOfCentralDirectory
     }
 
-#if swift(>=5.0)
-    var memoryFile: MemoryFile?
-
-    /// Initializes a new in-memory ZIP `Archive`.
-    ///
-    /// You can use this initalizer to create new in-memory archive files or to read and update existing ones.
-    ///
-    /// - Parameters:
-    ///   - data: `Data` object used as backing for in-memory archives.
-    ///   - mode: Access mode of the receiver.
-    ///   - pathEncoding: Encoding for entry paths. Overrides the encoding specified in the archive.
-    ///                   This encoding is only used when _decoding_ paths from the receiver.
-    ///                   Paths of entries added with `addEntry` are always UTF-8 encoded.
-    /// - Returns: An in-memory archive initialized with passed in backing data.
-    /// - Note:
-    ///   - The backing `data` _must_ contain a valid ZIP archive for `AccessMode.read` and `AccessMode.update`.
-    ///   - The backing `data` _must_ be empty (or omitted) for `AccessMode.create`.
-    public init(data: Data = Data(), accessMode mode: AccessMode, pathEncoding: String.Encoding? = nil) async throws {
-        guard let url = URL(string: "\(memoryURLScheme)://") else {
-            throw ArchiveError.unreadableArchive
-        }
-
-        self.url = url
-        self.accessMode = mode
-        self.pathEncoding = pathEncoding
-        let config = try await Archive.makeBackingConfiguration(for: data, mode: mode)
-        self.dataSource = config.dataSource
-        self.readChunkSize = defaultReadChunkSize
-        self.memoryFile = config.memoryFile
-        self.endOfCentralDirectoryRecord = config.endOfCentralDirectoryRecord
-        self.zip64EndOfCentralDirectory = config.zip64EndOfCentralDirectory
-    }
-#endif
-    
     deinit {
         try? dataSource.close()
     }

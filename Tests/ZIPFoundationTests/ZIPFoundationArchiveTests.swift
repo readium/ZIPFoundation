@@ -45,15 +45,6 @@ extension ZIPFoundationTests {
             XCTAssertFalse(tempURLs.contains(tempDir), "Temp directory URL should be unique. \(tempDir)")
             tempURLs.insert(tempDir)
         }
-
-#if swift(>=5.0)
-        // Also cover the fallback codepath in the helper method to generate a unique temp URL.
-        // In-memory archives have no filesystem representation and therefore don't need a per-volume
-        // temp URL.
-        let memoryArchive = try await Archive(data: Data(), accessMode: .create)
-        let memoryTempURL = URL.temporaryReplacementDirectoryURL(for: memoryArchive)
-        XCTAssertNotNil(memoryTempURL, "Temporary URL creation for in-memory archive failed.")
-#endif
     }
 }
 

@@ -305,7 +305,6 @@ extension Data {
         // https://bugs.swift.org/browse/SR-1774
         let mask = 0xffffffff as CRC32
         var result = checksum ^ mask
-#if swift(>=5.0)
         crcTable.withUnsafeBufferPointer { crcTablePointer in
             self.withUnsafeBytes { bufferPointer in
                 var bufferIndex = 0
@@ -317,51 +316,6 @@ extension Data {
                 }
             }
         }
-#else
-        self.withUnsafeBytes { (bytes) in
-            let bins = stride(from: 0, to: self.count, by: 256)
-            for bin in bins {
-                for binIndex in 0..<256 {
-                    let byteIndex = bin + binIndex
-                    guard byteIndex < self.count else { break }
-
-                    let byte = bytes[byteIndex]
-                    let index = Int((result ^ CRC32(byte)) & 0xff)
-                    result = (result >> 8) ^ crcTable[index]
-                }
-            }
-        }
-#endif
         return result ^ mask
     }
 }
-
-#if !swift(>=5.0)
-
-// Since Swift 5.0, `Data.withUnsafeBytes()` passes an `UnsafeRawBufferPointer` instead of an `UnsafePointer<UInt8>`
-// into `body`.
-// We provide a compatible method for targets that use Swift 4.x so that we can use the new version
-// across all language versions.
-
-extension Data {
-    func withUnsafeBytes<T>(_ body: (UnsafeRawBufferPointer) throws -> T) rethrows -> T {
-        let count = self.count
-        return try withUnsafeBytes { (pointer: UnsafePointer<UInt8>) throws -> T in
-            try body(UnsafeRawBufferPointer(start: pointer, count: count))
-        }
-    }
-
-    #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
-    #else
-    mutating func withUnsafeMutableBytes<T>(_ body: (UnsafeMutableRawBufferPointer) throws -> T) rethrows -> T {
-        let count = self.count
-        guard count > 0 else {
-            return try body(UnsafeMutableRawBufferPointer(start: nil, count: count))
-        }
-        return try withUnsafeMutableBytes { (pointer: UnsafeMutablePointer<UInt8>) throws -> T in
-            try body(UnsafeMutableRawBufferPointer(start: pointer, count: count))
-        }
-    }
-    #endif
-}
-#endif
