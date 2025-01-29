@@ -15,8 +15,6 @@
 		59248AA226B6EC770078ABDA /* ZIPFoundationErrorConditionTests+ZIP64.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59248AA126B6EC770078ABDA /* ZIPFoundationErrorConditionTests+ZIP64.swift */; };
 		5968EBED26D692360037EA62 /* ZIPFoundationReadingTests+ZIP64.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5968EBEC26D692360037EA62 /* ZIPFoundationReadingTests+ZIP64.swift */; };
 		5968EBF126D695AD0037EA62 /* ZIPFoundationFileManagerTests+ZIP64.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5968EBF026D695AD0037EA62 /* ZIPFoundationFileManagerTests+ZIP64.swift */; };
-		95B5A3D42366731B00D4D8FD /* Archive+MemoryFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95B5A3D32366731B00D4D8FD /* Archive+MemoryFile.swift */; };
-		95B5A3D72367999900D4D8FD /* ZIPFoundationMemoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95B5A3D52367983A00D4D8FD /* ZIPFoundationMemoryTests.swift */; };
 		BA0F722029756590006DD5DB /* ZIPFoundationFileAttributeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0F721F29756590006DD5DB /* ZIPFoundationFileAttributeTests.swift */; };
 		BA205D44273FCEB4001F9048 /* ZIPFoundationArchiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA205D43273FCEB4001F9048 /* ZIPFoundationArchiveTests.swift */; };
 		BA3716AB21F0A238006E54E6 /* ZIPFoundationProgressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA3716A921F0A1AC006E54E6 /* ZIPFoundationProgressTests.swift */; };
@@ -79,8 +77,6 @@
 		59248AA126B6EC770078ABDA /* ZIPFoundationErrorConditionTests+ZIP64.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ZIPFoundationErrorConditionTests+ZIP64.swift"; sourceTree = "<group>"; };
 		5968EBEC26D692360037EA62 /* ZIPFoundationReadingTests+ZIP64.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ZIPFoundationReadingTests+ZIP64.swift"; sourceTree = "<group>"; };
 		5968EBF026D695AD0037EA62 /* ZIPFoundationFileManagerTests+ZIP64.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ZIPFoundationFileManagerTests+ZIP64.swift"; sourceTree = "<group>"; };
-		95B5A3D32366731B00D4D8FD /* Archive+MemoryFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Archive+MemoryFile.swift"; sourceTree = "<group>"; };
-		95B5A3D52367983A00D4D8FD /* ZIPFoundationMemoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZIPFoundationMemoryTests.swift; sourceTree = "<group>"; };
 		BA0F721F29756590006DD5DB /* ZIPFoundationFileAttributeTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ZIPFoundationFileAttributeTests.swift; sourceTree = "<group>"; };
 		BA205D43273FCEB4001F9048 /* ZIPFoundationArchiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZIPFoundationArchiveTests.swift; sourceTree = "<group>"; };
 		BA3716A921F0A1AC006E54E6 /* ZIPFoundationProgressTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZIPFoundationProgressTests.swift; sourceTree = "<group>"; };
@@ -161,7 +157,6 @@
 				BA0F721F29756590006DD5DB /* ZIPFoundationFileAttributeTests.swift */,
 				OBJ_20 /* ZIPFoundationFileManagerTests.swift */,
 				5968EBF026D695AD0037EA62 /* ZIPFoundationFileManagerTests+ZIP64.swift */,
-				95B5A3D52367983A00D4D8FD /* ZIPFoundationMemoryTests.swift */,
 				OBJ_21 /* ZIPFoundationPerformanceTests.swift */,
 				BA3716A921F0A1AC006E54E6 /* ZIPFoundationProgressTests.swift */,
 				OBJ_22 /* ZIPFoundationReadingTests.swift */,
@@ -208,7 +203,6 @@
 				OBJ_11 /* Archive.swift */,
 				BACE20B726F7CE6C003BA312 /* Archive+BackingConfiguration.swift */,
 				BACE20B926F7D18A003BA312 /* Archive+Helpers.swift */,
-				95B5A3D32366731B00D4D8FD /* Archive+MemoryFile.swift */,
 				BA643D7B2648131C00018273 /* Archive+Progress.swift */,
 				OBJ_9 /* Archive+Reading.swift */,
 				CAF35E4B2D1187040042C460 /* DataSource.swift */,
@@ -336,7 +330,6 @@
 				OBJ_35 /* ZIPFoundationFileManagerTests.swift in Sources */,
 				OBJ_36 /* ZIPFoundationPerformanceTests.swift in Sources */,
 				OBJ_37 /* ZIPFoundationReadingTests.swift in Sources */,
-				95B5A3D72367999900D4D8FD /* ZIPFoundationMemoryTests.swift in Sources */,
 				59248AA226B6EC770078ABDA /* ZIPFoundationErrorConditionTests+ZIP64.swift in Sources */,
 				OBJ_38 /* ZIPFoundationTests.swift in Sources */,
 				OBJ_39 /* ZIPFoundationWritingTests.swift in Sources */,
@@ -352,7 +345,6 @@
 				OBJ_50 /* Archive.swift in Sources */,
 				BACE20B826F7CE6C003BA312 /* Archive+BackingConfiguration.swift in Sources */,
 				OBJ_51 /* Data+Compression.swift in Sources */,
-				95B5A3D42366731B00D4D8FD /* Archive+MemoryFile.swift in Sources */,
 				OBJ_52 /* Data+Serialization.swift in Sources */,
 				590A7DA826B0F91F00CBEFB4 /* Entry+ZIP64.swift in Sources */,
 				BACE20BA26F7D18A003BA312 /* Archive+Helpers.swift in Sources */,

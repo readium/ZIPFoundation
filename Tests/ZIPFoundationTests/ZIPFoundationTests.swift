@@ -262,7 +262,7 @@ extension ZIPFoundationTests {
             ("testUnzipUncontainedSymlink", testUnzipUncontainedSymlink),
             ("testZipItem", testZipItem),
             ("testLinuxTestSuiteIncludesAllTests", testLinuxTestSuiteIncludesAllTests)
-        ] + zip64Tests + darwinOnlyTests + swift5OnlyTests
+        ] + zip64Tests + darwinOnlyTests
     }
 
     static var zip64Tests: [(String, (ZIPFoundationTests) -> () async throws -> Void)] {
@@ -326,26 +326,6 @@ extension ZIPFoundationTests {
             ("testSymlinkPermissionsTransferErrorConditions", testSymlinkPermissionsTransferErrorConditions),
             // Applying file modification dates is currently unsupported in corelibs Foundation
             ("testSymlinkModificationDateTransferErrorConditions", testSymlinkModificationDateTransferErrorConditions)
-        ]
-        #else
-        return []
-        #endif
-    }
-
-    static var swift5OnlyTests: [(String, (ZIPFoundationTests) -> () async throws -> Void)] {
-        #if swift(>=5.0)
-        return [
-            ("testAppendFile", testAppendFile),
-            ("testCreateArchiveAddUncompressedEntryToMemory", testCreateArchiveAddUncompressedEntryToMemory),
-            ("testCreateArchiveAddCompressedEntryToMemory", testCreateArchiveAddCompressedEntryToMemory),
-            ("testUpdateArchiveRemoveUncompressedEntryFromMemory", testUpdateArchiveRemoveUncompressedEntryFromMemory),
-            ("testExtractCompressedFolderEntriesFromMemory", testExtractCompressedFolderEntriesFromMemory),
-            ("testExtractUncompressedFolderEntriesFromMemory", testExtractUncompressedFolderEntriesFromMemory),
-            ("testMemoryArchiveErrorConditions", testMemoryArchiveErrorConditions),
-            ("testWriteOnlyFile", testWriteOnlyFile),
-            ("testReadOnlyFile", testReadOnlyFile),
-            ("testReadOnlySlicedFile", testReadOnlySlicedFile),
-            ("testReadWriteFile", testReadWriteFile)
         ]
         #else
         return []
