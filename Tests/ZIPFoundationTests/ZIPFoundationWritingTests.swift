@@ -257,7 +257,7 @@ extension ZIPFoundationTests {
         // uses. To exercise the error code path, we temporarily limit the number of open files for
         // the test process to exercise the error code path here.
         await XCTAssertNoThrowAsync(try await self.runWithFileDescriptorLimit(0) {
-            await XCTAssertCocoaError(try await archive.remove(entryToRemove), throwsErrorWithCode: .fileWriteUnknown)
+            await XCTAssertPOSIXError(try await archive.remove(entryToRemove), throwsErrorWithCode: .EMFILE)
         })
         let readonlyArchive = await self.archive(for: #function, mode: .read)
         await XCTAssertSwiftError(try await readonlyArchive.remove(entryToRemove), throws: Archive.ArchiveError.unwritableArchive)

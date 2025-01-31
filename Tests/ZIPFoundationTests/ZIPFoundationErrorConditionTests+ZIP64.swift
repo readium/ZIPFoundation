@@ -13,28 +13,39 @@ import XCTest
 
 extension ZIPFoundationTests {
 
-    func testWriteEOCDWithTooLargeSizeOfCentralDirectory() async {
+    func testWriteEOCDWithTooLargeSizeOfCentralDirectory() async throws {
         let archive = await self.archive(for: #function, mode: .create)
         archive.zip64EndOfCentralDirectory = makeMockZIP64EndOfCentralDirectory(sizeOfCentralDirectory: .max,
                                                                                 numberOfEntries: 0)
-        await XCTAssertSwiftError(
-            try await archive.writeEndOfCentralDirectory(centralDirectoryStructure: makeMockCentralDirectory()!,
-                                                                   startOfCentralDirectory: 0,
-                                                                   startOfEndOfCentralDirectory: 0,
-                                                                   operation: .add),
-                            throws: Archive.ArchiveError.invalidCentralDirectorySize)
+        try await archive.dataSource.write { transaction in
+            await XCTAssertSwiftError(
+                try await archive.writeEndOfCentralDirectory(
+                    transaction: transaction,
+                    centralDirectoryStructure: makeMockCentralDirectory()!,
+                    startOfCentralDirectory: 0,
+                    startOfEndOfCentralDirectory: 0,
+                    operation: .add
+                ),
+                throws: Archive.ArchiveError.invalidCentralDirectorySize)
+        }
     }
 
-    func testWriteEOCDWithTooLargeCentralDirectoryOffset() async {
+    func testWriteEOCDWithTooLargeCentralDirectoryOffset() async throws {
         let archive = await self.archive(for: #function, mode: .create)
         archive.zip64EndOfCentralDirectory = makeMockZIP64EndOfCentralDirectory(sizeOfCentralDirectory: 0,
                                                                                 numberOfEntries: .max)
-        await XCTAssertSwiftError(
-            try await archive.writeEndOfCentralDirectory(centralDirectoryStructure: makeMockCentralDirectory()!,
-                                                                   startOfCentralDirectory: 0,
-                                                                   startOfEndOfCentralDirectory: 0,
-                                                                   operation: .add),
-                            throws: Archive.ArchiveError.invalidCentralDirectoryEntryCount)
+        try await archive.dataSource.write { transaction in
+            await XCTAssertSwiftError(
+                try await archive.writeEndOfCentralDirectory(
+                    transaction: transaction,
+                    centralDirectoryStructure: makeMockCentralDirectory()!,
+                    startOfCentralDirectory: 0,
+                    startOfEndOfCentralDirectory: 0,
+                    operation: .add
+                ),
+                throws: Archive.ArchiveError.invalidCentralDirectoryEntryCount
+            )
+        }
     }
 
     // MARK: - Helper

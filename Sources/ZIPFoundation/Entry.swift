@@ -15,7 +15,7 @@ import CoreFoundation
 ///
 /// You can retrieve instances of `Entry` from an `Archive` via subscripting or iteration.
 /// Entries are identified by their `path`.
-public struct Entry: Equatable {
+public struct Entry: Equatable, Sendable {
     /// The type of an `Entry` in a ZIP `Archive`.
     public enum EntryType: Int {
         /// Indicates a regular file.
@@ -62,7 +62,7 @@ public struct Entry: Equatable {
         var extraFields: [ExtensibleDataField]?
     }
 
-    struct DataDescriptor<T: BinaryInteger>: DataSerializable {
+    struct DataDescriptor<T: BinaryInteger & Sendable>: DataSerializable, Sendable {
         let data: Data
         let dataDescriptorSignature = UInt32(dataDescriptorStructSignature)
         let crc32: UInt32
@@ -77,7 +77,7 @@ public struct Entry: Equatable {
     typealias DefaultDataDescriptor = DataDescriptor<UInt32>
     typealias ZIP64DataDescriptor = DataDescriptor<UInt64>
 
-    struct CentralDirectoryStructure: DataSerializable {
+    struct CentralDirectoryStructure: DataSerializable, Sendable {
         let centralDirectorySignature = UInt32(centralDirectoryStructSignature)
         let versionMadeBy: UInt16
         let versionNeededToExtract: UInt16

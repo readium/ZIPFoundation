@@ -90,34 +90,52 @@ extension Archive {
         guard bufferSize > 0 else {
             throw ArchiveError.invalidBufferSize
         }
-        var checksum = CRC32(0)
         let localFileHeader = entry.localFileHeader
         guard entry.dataOffset <= .max else { throw ArchiveError.invalidLocalHeaderDataOffset }
-        try await dataSource.seek(to: entry.dataOffset)
-        progress?.totalUnitCount = self.totalUnitCountForReading(entry)
-        switch entry.type {
-        case .file:
-            guard let compressionMethod = CompressionMethod(rawValue: localFileHeader.compressionMethod) else {
-                throw ArchiveError.invalidCompressionMethod
+        
+        return try await dataSource.read { transaction in
+            var checksum = CRC32(0)
+            try await transaction.seek(to: entry.dataOffset)
+            progress?.totalUnitCount = self.totalUnitCountForReading(entry)
+            switch entry.type {
+            case .file:
+                guard let compressionMethod = CompressionMethod(rawValue: localFileHeader.compressionMethod) else {
+                    throw ArchiveError.invalidCompressionMethod
+                }
+                switch compressionMethod {
+                case .none:
+                    checksum = try await self.readUncompressed(
+                        transaction: transaction,
+                        entry: entry,
+                        bufferSize: bufferSize,
+                        skipCRC32: skipCRC32,
+                        progress: progress,
+                        with: consumer
+                    )
+                    
+                case .deflate:
+                    checksum = try await self.readCompressed(
+                        transaction: transaction,
+                        entry: entry,
+                        bufferSize: bufferSize,
+                        skipCRC32: skipCRC32,
+                        progress: progress,
+                        with: consumer
+                    )
+                }
+            case .directory:
+                try await consumer(Data())
+                progress?.completedUnitCount = self.totalUnitCountForReading(entry)
+            case .symlink:
+                let localFileHeader = entry.localFileHeader
+                let size = Int(localFileHeader.compressedSize)
+                let data = try await transaction.read(length: size)
+                checksum = data.crc32(checksum: 0)
+                try await consumer(data)
+                progress?.completedUnitCount = self.totalUnitCountForReading(entry)
             }
-            switch compressionMethod {
-            case .none: checksum = try await self.readUncompressed(entry: entry, bufferSize: bufferSize,
-                                                             skipCRC32: skipCRC32, progress: progress, with: consumer)
-            case .deflate: checksum = try await self.readCompressed(entry: entry, bufferSize: bufferSize,
-                                                              skipCRC32: skipCRC32, progress: progress, with: consumer)
-            }
-        case .directory:
-            try await consumer(Data())
-            progress?.completedUnitCount = self.totalUnitCountForReading(entry)
-        case .symlink:
-            let localFileHeader = entry.localFileHeader
-            let size = Int(localFileHeader.compressedSize)
-            let data = try await dataSource.read(length: size)
-            checksum = data.crc32(checksum: 0)
-            try await consumer(data)
-            progress?.completedUnitCount = self.totalUnitCountForReading(entry)
+            return checksum
         }
-        return checksum
     }
     
     /// Read a portion of a ZIP `Entry` from the receiver and forward its contents to a `Consumer` closure.
@@ -170,17 +188,19 @@ extension Archive {
         bufferSize: Int,
         consumer: Consumer
     ) async throws {
-        try await dataSource.seek(to: entry.dataOffset + range.lowerBound)
-        
-        _ = try await Data.consumePart(
-            of: Int64(range.count),
-            chunkSize: bufferSize,
-            skipCRC32: true,
-            provider: { pos, chunkSize -> Data in
-                try await dataSource.read(length: chunkSize)
-            },
-            consumer: consumer
-        )
+        try await dataSource.read { transaction in
+            try await transaction.seek(to: entry.dataOffset + range.lowerBound)
+            
+            _ = try await Data.consumePart(
+                of: Int64(range.count),
+                chunkSize: bufferSize,
+                skipCRC32: true,
+                provider: { pos, chunkSize -> Data in
+                    try await transaction.read(length: chunkSize)
+                },
+                consumer: consumer
+            )
+        }
     }
     
     /// Ranges of deflated entries cannot be accessed randomly. We must read
@@ -191,39 +211,42 @@ extension Archive {
         bufferSize: Int,
         consumer: Consumer
     ) async throws {
-        var bytesRead: UInt64 = 0
-        
-        do {
-            try await dataSource.seek(to: entry.dataOffset)
+        try await dataSource.read { transaction in
+            var bytesRead: UInt64 = 0
             
-            _ = try await readCompressed(
-                entry: entry,
-                bufferSize: bufferSize,
-                skipCRC32: true
-            ) { chunk in
-                let chunkSize = UInt64(chunk.count)
+            do {
+                try await transaction.seek(to: entry.dataOffset)
                 
-                if bytesRead >= range.lowerBound {
-                    if bytesRead + chunkSize > range.upperBound {
-                        let remainingBytes = range.upperBound - bytesRead
-                        try await consumer(chunk[..<remainingBytes])
-                    } else {
-                        try await consumer(chunk)
+                _ = try await readCompressed(
+                    transaction: transaction,
+                    entry: entry,
+                    bufferSize: bufferSize,
+                    skipCRC32: true
+                ) { chunk in
+                    let chunkSize = UInt64(chunk.count)
+                    
+                    if bytesRead >= range.lowerBound {
+                        if bytesRead + chunkSize > range.upperBound {
+                            let remainingBytes = range.upperBound - bytesRead
+                            try await consumer(chunk[..<remainingBytes])
+                        } else {
+                            try await consumer(chunk)
+                        }
+                    } else if bytesRead + chunkSize > range.lowerBound {
+                        // Calculate the overlap and pass the relevant portion of the chunk
+                        let start = range.lowerBound - bytesRead
+                        let end = Swift.min(chunkSize, range.upperBound - bytesRead)
+                        try await consumer(chunk[start..<end])
                     }
-                } else if bytesRead + chunkSize > range.lowerBound {
-                    // Calculate the overlap and pass the relevant portion of the chunk
-                    let start = range.lowerBound - bytesRead
-                    let end = Swift.min(chunkSize, range.upperBound - bytesRead)
-                    try await consumer(chunk[start..<end])
+                    
+                    bytesRead += chunkSize
+                    
+                    guard bytesRead < range.upperBound else {
+                        throw EndOfRange()
+                    }
                 }
-                
-                bytesRead += chunkSize
-                
-                guard bytesRead < range.upperBound else {
-                    throw EndOfRange()
-                }
-            }
-        } catch is EndOfRange { }
+            } catch is EndOfRange { }
+        }
     }
     
     private struct EndOfRange: Error {}

@@ -8,45 +8,64 @@
 import Foundation
 
 /// A `DataSource` working with a ZIP file on the file system.
-actor FileDataSource : WritableDataSource {
+final class FileDataSource: DataSource {
     
-    enum AccessMode: String {
-        case read = "rb"
-        case write = "rb+"
-    }
+    let isWritable: Bool
+    private let url: URL
+    private let length: UInt64
     
-    let file: FILEPointer
-    var isClosed: Bool = false
-    
-    init(url: URL, mode: AccessMode) async throws {
+    init(url: URL, isWritable: Bool) async throws {
         precondition(url.isFileURL)
         
-        let fsRepr = FileManager.default.fileSystemRepresentation(withPath: url.path)
-        guard let file = fopen(fsRepr, mode.rawValue) else {
-            throw POSIXError(errno, path: url.path)
+        let file = try url.open(mode: .read)
+        fseeko(file, 0, SEEK_END)
+        try file.checkNoError()
+        let length = UInt64(ftello(file))
+        try file.checkNoError()
+        fclose(file)
+
+        self.url = url
+        self.isWritable = isWritable
+        self.length = UInt64(length)
+    }
+    
+    func length() async throws -> UInt64 { length }
+    
+    func openRead() async throws -> any DataSourceTransaction {
+        try await FileDataSourceTransaction(url: url, mode: .read)
+    }
+    
+    func openWrite() async throws -> any WritableDataSourceTransaction {
+        guard isWritable else {
+            throw DataSourceError.notWritable
         }
-        
-        self.init(file: file)
-        
+        return try await FileDataSourceTransaction(url: url, mode: .write)
+    }
+}
+
+private enum FileAccessMode: String {
+    case read = "rb"
+    case write = "rb+"
+}
+
+private actor FileDataSourceTransaction: WritableDataSourceTransaction {
+
+    private var file: FILEPointer
+    
+    init(url: URL, mode: FileAccessMode) async throws {
+        self.file = try url.open(mode: mode)
+
         setvbuf(file, nil, _IOFBF, Int(defaultPOSIXBufferSize))
         try checkNoError()
         
         try await seek(to: 0)
     }
     
-    init(file: FILEPointer) {
-        self.file = file
-    }
-    
-    func length() async throws -> UInt64 {
-        let currentPos = try await position()
-        fseeko(file, 0, SEEK_END)
+    func close() async throws {
+        fclose(file)
         try checkNoError()
-        let length = try await position()
-        try await seek(to: currentPos)
-        return length
     }
-    
+
     func position() async throws -> UInt64 {
         let position = ftello(file)
         try checkNoError()
@@ -108,31 +127,34 @@ actor FileDataSource : WritableDataSource {
         try checkNoError()
     }
     
-    nonisolated func close() {
-        Task {
-            do {
-                try await close()
-            } catch {
-                print(error)
-            }
-        }
-    }
-    
-    private func close() async throws {
-        guard !isClosed else {
-            return
-        }
-        fclose(file)
-        try checkNoError()
-        isClosed = true
-    }
-    
     private func checkNoError() throws {
         let code = ferror(file)
         guard code > 0 else {
             return
         }
         clearerr(file)
+        
+        throw POSIXError(POSIXError.Code(rawValue: code) ?? .EPERM)
+    }
+}
+
+private extension URL {
+    func open(mode: FileAccessMode) throws -> FILEPointer {
+        let fsRepr = FileManager.default.fileSystemRepresentation(withPath: path)
+        guard let file = fopen(fsRepr, mode.rawValue) else {
+            throw POSIXError(errno, path: path)
+        }
+        return file
+    }
+}
+
+private extension FILEPointer {
+    func checkNoError() throws {
+        let code = ferror(self)
+        guard code > 0 else {
+            return
+        }
+        clearerr(self)
         
         throw POSIXError(POSIXError.Code(rawValue: code) ?? .EPERM)
     }
