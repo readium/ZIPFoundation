@@ -74,9 +74,9 @@ extension Archive {
         bufferSize: Int,
         progress: Progress? = nil,
         provider: Provider
-    ) async throws -> (sizeWritten: Int64, crc32: CRC32) {
+    ) async throws -> (sizeWritten: UInt64, crc32: CRC32) {
         var checksum = CRC32(0)
-        var sizeWritten = Int64(0)
+        var sizeWritten = UInt64(0)
         switch type {
         case .file:
             switch compressionMethod {
@@ -104,7 +104,7 @@ extension Archive {
                 size: Int(uncompressedSize),
                 provider: provider
             )
-            (sizeWritten, checksum) = (Int64(linkSizeWritten), linkChecksum)
+            (sizeWritten, checksum) = (linkSizeWritten, linkChecksum)
             if let progress = progress { progress.completedUnitCount = progress.totalUnitCount }
         }
         return (sizeWritten, checksum)
@@ -274,9 +274,9 @@ extension Archive {
         bufferSize: Int,
         progress: Progress? = nil,
         provider: Provider
-    ) async throws -> (sizeWritten: Int64, checksum: CRC32) {
+    ) async throws -> (sizeWritten: UInt64, checksum: CRC32) {
         var position: Int64 = 0
-        var sizeWritten: Int64 = 0
+        var sizeWritten: UInt64 = 0
         var checksum = CRC32(0)
         while position < size {
             if progress?.isCancelled == true { throw ArchiveError.cancelledOperation }
@@ -284,9 +284,9 @@ extension Archive {
             let entryChunk = try await provider(position, readSize)
             checksum = entryChunk.crc32(checksum: checksum)
             try await transaction.write(entryChunk)
-            sizeWritten += Int64(entryChunk.count)
+            sizeWritten += UInt64(entryChunk.count)
             position += Int64(bufferSize)
-            progress?.completedUnitCount = sizeWritten
+            progress?.completedUnitCount = Int64(sizeWritten)
         }
         return (sizeWritten, checksum)
     }
@@ -297,11 +297,11 @@ extension Archive {
         bufferSize: Int,
         progress: Progress? = nil,
         provider: Provider
-    ) async throws -> (sizeWritten: Int64, checksum: CRC32) {
-        var sizeWritten: Int64 = 0
+    ) async throws -> (sizeWritten: UInt64, checksum: CRC32) {
+        let sizeWritten = SharedMutableValue<UInt64>()
         let consumer: Consumer = { data in
             try await transaction.write(data)
-            sizeWritten += Int64(data.count)
+            await sizeWritten.increment(UInt64(data.count))
         }
         let checksum = try await Data.compress(
             size: size, bufferSize: bufferSize,
@@ -313,19 +313,19 @@ extension Archive {
             },
             consumer: consumer
         )
-        return(sizeWritten, checksum)
+        return (await sizeWritten.get(), checksum)
     }
 
     func writeSymbolicLink(
         transaction: WritableDataSourceTransaction,
         size: Int,
         provider: Provider
-    ) async throws -> (sizeWritten: Int, checksum: CRC32) {
+    ) async throws -> (sizeWritten: UInt64, checksum: CRC32) {
         // The reported size of a symlink is the number of characters in the path it points to.
         let linkData = try await provider(0, size)
         let checksum = linkData.crc32(checksum: 0)
         try await transaction.write(linkData)
-        return (linkData.count, checksum)
+        return (UInt64(linkData.count), checksum)
     }
 
     func writeZIP64EOCD(

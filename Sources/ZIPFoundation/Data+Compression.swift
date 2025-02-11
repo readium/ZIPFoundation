@@ -15,7 +15,7 @@ import zlib
 #endif
 
 /// The compression method of an `Entry` in a ZIP `Archive`.
-public enum CompressionMethod: UInt16 {
+public enum CompressionMethod: UInt16, Sendable {
     /// Indicates that an `Entry` has no compression applied to its contents.
     case none = 0
     /// Indicates that contents of an `Entry` have been compressed with a zlib compatible Deflate algorithm.
@@ -28,14 +28,14 @@ public typealias CRC32 = UInt32
 /// - Parameters:
 ///   - data: A chunk of `Data` to consume.
 /// - Throws: Can throw to indicate errors during data consumption.
-public typealias Consumer = (_ data: Data) async throws -> Void
+public typealias Consumer = @Sendable (_ data: Data) async throws -> Void
 /// A custom handler that receives a position and a size that can be used to provide data from an arbitrary source.
 /// - Parameters:
 ///   - position: The current read position.
 ///   - size: The size of the chunk to provide.
 /// - Returns: A chunk of `Data`.
 /// - Throws: Can throw to indicate errors in the data source.
-public typealias Provider = (_ position: Int64, _ size: Int) async throws -> Data
+public typealias Provider = @Sendable (_ position: Int64, _ size: Int) async throws -> Data
 
 extension Data {
     enum CompressionError: Error {

@@ -35,31 +35,10 @@ extension DataSource {
     public func openWrite() async throws -> WritableDataSourceTransaction {
         throw DataSourceError.notWritable
     }
-    
-    /// Opens a transaction to read data from the source and closes it
-    /// automatically after running `body`.
-    func read<T: Sendable>(_ body: (DataSourceTransaction) async throws -> T) async throws -> T {
-        let transaction = try await openRead()
-        let result = try await body(transaction)
-        try await transaction.close()
-        return result
-    }
-    
-    /// Opens a transaction to modify the source and closes it automatically
-    /// after running `body`.
-    func write<T: Sendable>(_ body: (WritableDataSourceTransaction) async throws -> T) async throws -> T {
-        let transaction = try await openWrite()
-        let result = try await body(transaction)
-        try await transaction.close()
-        return result
-    }
 }
 
 /// A ``DataSource`` abstract the access to the ZIP data.
 public protocol DataSourceTransaction: Sendable {
-    
-    /// Closes the transaction.
-    func close() async throws
 
     /// Gets the current offset position.
     func position() async throws -> UInt64

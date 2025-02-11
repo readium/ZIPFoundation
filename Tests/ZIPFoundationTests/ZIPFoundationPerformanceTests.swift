@@ -125,7 +125,7 @@ extension ZIPFoundationTests {
 }
 
 extension XCTestCase {
-    func measureAsync(timeout: TimeInterval = 100, _ block: @escaping () async -> Void) async {
+    func measureAsync(timeout: TimeInterval = 100, _ block: @Sendable @escaping () async -> Void) async {
         let exp = expectation(description: "Finished")
         Task {
             await block()

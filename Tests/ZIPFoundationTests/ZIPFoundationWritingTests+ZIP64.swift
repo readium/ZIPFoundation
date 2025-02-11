@@ -52,8 +52,10 @@ extension ZIPFoundationTests {
             // ZIP64 End of Central Directory
             let zip64EOCDOffset: UInt64 = cdOffset + cdSize
             fseeko(archiveFile, off_t(zip64EOCDOffset), SEEK_SET)
-            let zip64EOCDSize = checkZIP64EndOfCentralDirectory(archive: archive, cdSize: cdSize, cdOffset: cdOffset,
-                                                                zip64EOCDOffset: zip64EOCDOffset) { size in
+            let zip64EOCDSize = await checkZIP64EndOfCentralDirectory(
+                archive: archive, cdSize: cdSize, cdOffset: cdOffset,
+                zip64EOCDOffset: zip64EOCDOffset
+            ) { size in
                 try Data.readChunk(of: size, from: archiveFile)
             }
             // End of Central Directory
@@ -116,9 +118,10 @@ extension ZIPFoundationTests {
     }
 
     private func checkZIP64EndOfCentralDirectory(archive: Archive, cdSize: UInt64, cdOffset: UInt64,
-                                                 zip64EOCDOffset: UInt64, readData: (Int) throws -> Data) -> UInt64 {
-        XCTAssertEqual(archive.endOfCentralDirectoryRecord.offsetToStartOfCentralDirectory, UInt32.max)
-        XCTAssertEqual(archive.zip64EndOfCentralDirectory?.record.offsetToStartOfCentralDirectory ?? 0, cdOffset)
+                                                 zip64EOCDOffset: UInt64, readData: (Int) throws -> Data) async -> UInt64 {
+        let eocd = await archive.endOfCentralDirectory
+        XCTAssertEqual(eocd.0.offsetToStartOfCentralDirectory, UInt32.max)
+        XCTAssertEqual(eocd.1?.record.offsetToStartOfCentralDirectory ?? 0, cdOffset)
         do {
             let zip64EOCDSize = 56 + 20
             let zip64EOCDData = try readData(zip64EOCDSize)
@@ -151,7 +154,7 @@ extension ZIPFoundationTests {
         let size = 64 * 64 * 2
         let data = Data.makeRandomData(size: size)
         let entryName = ProcessInfo.processInfo.globallyUniqueString
-        let currentLFHOffset = archive.offsetToStartOfCentralDirectory
+        let currentLFHOffset = await archive.offsetToStartOfCentralDirectory
         do {
             try await archive.addFileEntry(with: entryName, size: size, data: data)
         } catch {
@@ -171,7 +174,7 @@ extension ZIPFoundationTests {
         defer { self.resetIntMaxValues() }
         let archive = await self.archive(for: #function, mode: .update)
         let entryName = "Test"
-        let currentLFHOffset = archive.offsetToStartOfCentralDirectory
+        let currentLFHOffset = await archive.offsetToStartOfCentralDirectory
         do {
             try await archive.addEntry(with: entryName, type: .directory,
                                  uncompressedSize: Int64(0), provider: { _, _ in return Data() })
@@ -205,8 +208,9 @@ extension ZIPFoundationTests {
             XCTFail("Failed to add ZIP64 format entry to archive with error : \(error)"); return
         }
         await archive.checkIntegrity()
-        XCTAssertEqual(archive.endOfCentralDirectoryRecord.totalNumberOfEntriesInCentralDirectory, UInt16(factor - 1))
-        XCTAssertNil(archive.zip64EndOfCentralDirectory?.record.totalNumberOfEntriesInCentralDirectory)
+        var eocd = await archive.endOfCentralDirectory
+        XCTAssertEqual(eocd.0.totalNumberOfEntriesInCentralDirectory, UInt16(factor - 1))
+        XCTAssertNil(eocd.1?.record.totalNumberOfEntriesInCentralDirectory)
         // Case 2: The total number os entries is equal to maximum value
         do {
             try await archive.addEntry(with: "Test", type: .directory,
@@ -215,8 +219,9 @@ extension ZIPFoundationTests {
             XCTFail("Failed to add ZIP64 format entry to archive with error : \(error)"); return
         }
         await archive.checkIntegrity()
-        XCTAssertEqual(archive.endOfCentralDirectoryRecord.totalNumberOfEntriesInCentralDirectory, UInt16.max)
-        XCTAssertEqual(archive.zip64EndOfCentralDirectory?.record.totalNumberOfEntriesInCentralDirectory ?? 0,
+        eocd = await archive.endOfCentralDirectory
+        XCTAssertEqual(eocd.0.totalNumberOfEntriesInCentralDirectory, UInt16.max)
+        XCTAssertEqual(eocd.1?.record.totalNumberOfEntriesInCentralDirectory ?? 0,
                        UInt64(factor))
     }
 
@@ -237,8 +242,9 @@ extension ZIPFoundationTests {
             XCTFail("Failed to add ZIP64 format entry to archive with error : \(error)"); return
         }
         await archive.checkIntegrity()
-        XCTAssertLessThan(archive.endOfCentralDirectoryRecord.sizeOfCentralDirectory, UInt32.max)
-        XCTAssertNil(archive.zip64EndOfCentralDirectory?.record.sizeOfCentralDirectory)
+        var eocd = await archive.endOfCentralDirectory
+        XCTAssertLessThan(eocd.0.sizeOfCentralDirectory, UInt32.max)
+        XCTAssertNil(eocd.1?.record.sizeOfCentralDirectory)
         // Case 2: The size of central directory is greater than maximum value
         do {
             let data = Data.makeRandomData(size: size)
@@ -248,8 +254,9 @@ extension ZIPFoundationTests {
             XCTFail("Failed to add ZIP64 format entry to archive with error : \(error)"); return
         }
         await archive.checkIntegrity()
-        XCTAssertEqual(archive.endOfCentralDirectoryRecord.sizeOfCentralDirectory, UInt32.max)
-        XCTAssertLessThan(0, archive.zip64EndOfCentralDirectory?.record.sizeOfCentralDirectory ?? 0)
+        eocd = await archive.endOfCentralDirectory
+        XCTAssertEqual(eocd.0.sizeOfCentralDirectory, UInt32.max)
+        XCTAssertLessThan(0, eocd.1?.record.sizeOfCentralDirectory ?? 0)
     }
 
     func testRemoveEntryFromArchiveWithZIP64EOCD() async throws {
@@ -269,7 +276,8 @@ extension ZIPFoundationTests {
             XCTFail("Failed to remove entry from archive with error : \(error)")
         }
         await archive.checkIntegrity()
-        XCTAssertNotNil(archive.zip64EndOfCentralDirectory)
+        let eocd = await archive.endOfCentralDirectory
+        XCTAssertNotNil(eocd.1)
     }
 
     func testRemoveZIP64EntryFromArchiveWithZIP64EOCD() async throws {
@@ -289,7 +297,8 @@ extension ZIPFoundationTests {
             XCTFail("Failed to remove entry from archive with error : \(error)")
         }
         await archive.checkIntegrity()
-        XCTAssertNil(archive.zip64EndOfCentralDirectory)
+        let eocd = await archive.endOfCentralDirectory
+        XCTAssertNil(eocd.1)
     }
 
     func testRemoveEntryWithZIP64ExtendedInformation() async throws {

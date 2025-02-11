@@ -50,7 +50,7 @@ private enum FileAccessMode: String {
 
 private actor FileDataSourceTransaction: WritableDataSourceTransaction {
 
-    private var file: FILEPointer
+    private let file: FILEPointer
     
     init(url: URL, mode: FileAccessMode) async throws {
         self.file = try url.open(mode: mode)
@@ -61,9 +61,8 @@ private actor FileDataSourceTransaction: WritableDataSourceTransaction {
         try await seek(to: 0)
     }
     
-    func close() async throws {
+    deinit {
         fclose(file)
-        try checkNoError()
     }
 
     func position() async throws -> UInt64 {

@@ -17,7 +17,7 @@ import CoreFoundation
 /// Entries are identified by their `path`.
 public struct Entry: Equatable, Sendable {
     /// The type of an `Entry` in a ZIP `Archive`.
-    public enum EntryType: Int {
+    public enum EntryType: Int, Sendable {
         /// Indicates a regular file.
         case file
         /// Indicates a directory.
