@@ -16,6 +16,8 @@ public typealias FILEPointer = OpaquePointer
 public typealias FILEPointer = UnsafeMutablePointer<FILE>
 #endif
 
+extension FILEPointer: @unchecked @retroactive Sendable {}
+
 protocol DataSerializable {
     static var size: Int { get }
     init?(data: Data, additionalDataProvider: (Int) async throws -> Data) async
@@ -89,7 +91,7 @@ extension Data {
         #endif
     }
 
-    static func write(chunk: Data, to file: FILEPointer) throws -> Int {
+    @Sendable static func write(chunk: Data, to file: FILEPointer) throws -> Int {
         var sizeWritten: Int = 0
         chunk.withUnsafeBytes { (rawBufferPointer) in
             if let baseAddress = rawBufferPointer.baseAddress, rawBufferPointer.count > 0 {

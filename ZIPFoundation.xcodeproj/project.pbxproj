@@ -26,6 +26,7 @@
 		BACE20B826F7CE6C003BA312 /* Archive+BackingConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BACE20B726F7CE6C003BA312 /* Archive+BackingConfiguration.swift */; };
 		BACE20BA26F7D18A003BA312 /* Archive+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = BACE20B926F7D18A003BA312 /* Archive+Helpers.swift */; };
 		BACE20BD26F7D545003BA312 /* Entry+Serialization.swift in Sources */ = {isa = PBXBuildFile; fileRef = BACE20BC26F7D545003BA312 /* Entry+Serialization.swift */; };
+		CAD796BF2D5BE0AD0014099B /* SharedMutableValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAD796BE2D5BE09C0014099B /* SharedMutableValue.swift */; };
 		CAF35E4D2D1187060042C460 /* DataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF35E4B2D1187040042C460 /* DataSource.swift */; };
 		CAF35E502D11A4290042C460 /* FileDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF35E4E2D11A4260042C460 /* FileDataSource.swift */; };
 		OBJ_33 /* ZIPFoundationDataSerializationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = OBJ_18 /* ZIPFoundationDataSerializationTests.swift */; };
@@ -88,6 +89,7 @@
 		BACE20B726F7CE6C003BA312 /* Archive+BackingConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Archive+BackingConfiguration.swift"; sourceTree = "<group>"; };
 		BACE20B926F7D18A003BA312 /* Archive+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Archive+Helpers.swift"; sourceTree = "<group>"; };
 		BACE20BC26F7D545003BA312 /* Entry+Serialization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Entry+Serialization.swift"; sourceTree = "<group>"; };
+		CAD796BE2D5BE09C0014099B /* SharedMutableValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedMutableValue.swift; sourceTree = "<group>"; };
 		CAF35E4B2D1187040042C460 /* DataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataSource.swift; sourceTree = "<group>"; };
 		CAF35E4E2D11A4260042C460 /* FileDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileDataSource.swift; sourceTree = "<group>"; };
 		OBJ_10 /* Archive+Writing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Archive+Writing.swift"; sourceTree = "<group>"; };
@@ -199,6 +201,7 @@
 		OBJ_8 /* ZIPFoundation */ = {
 			isa = PBXGroup;
 			children = (
+				CAD796BE2D5BE09C0014099B /* SharedMutableValue.swift */,
 				BA9AFCC72ABB642000A1268C /* Resources */,
 				OBJ_11 /* Archive.swift */,
 				BACE20B726F7CE6C003BA312 /* Archive+BackingConfiguration.swift */,
@@ -351,6 +354,7 @@
 				590A7DA626B0F8F800CBEFB4 /* Archive+ZIP64.swift in Sources */,
 				BA643D7A264811FB00018273 /* URL+ZIP.swift in Sources */,
 				BA58FB162951F49400892CE7 /* Date+ZIP.swift in Sources */,
+				CAD796BF2D5BE0AD0014099B /* SharedMutableValue.swift in Sources */,
 				OBJ_53 /* Entry.swift in Sources */,
 				OBJ_54 /* FileManager+ZIP.swift in Sources */,
 				BA643D7C2648131C00018273 /* Archive+Progress.swift in Sources */,

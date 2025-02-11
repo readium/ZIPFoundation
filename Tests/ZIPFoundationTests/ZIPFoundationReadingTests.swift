@@ -197,19 +197,20 @@ extension ZIPFoundationTests {
     func testExtractUncompressedEmptyFile() async throws {
         // We had a logic error, where completion handlers for empty entries were not called
         // Ensure that this edge case works
-        var didCallCompletion = false
+        let didCallCompletion = SharedMutableValue(false)
         let archive = await self.archive(for: #function, mode: .read)
         guard let entry = try await archive.get("empty.txt") else { XCTFail("Failed to extract entry."); return }
 
         do {
             _ = try await archive.extract(entry) { (data) in
                 XCTAssertEqual(data.count, 0)
-                didCallCompletion = true
+                await didCallCompletion.set(true)
             }
         } catch {
             XCTFail("Unexpected error while trying to extract empty file of uncompressed archive.")
         }
-        XCTAssert(didCallCompletion)
+        let didCallCompletionValue = await didCallCompletion.get()
+        XCTAssert(didCallCompletionValue)
     }
 
     func testExtractUncompressedEntryCancelation() async throws {
@@ -217,10 +218,10 @@ extension ZIPFoundationTests {
         guard let entry = try await archive.get("original") else { XCTFail("Failed to extract entry."); return }
         let progress = archive.makeProgressForReading(entry)
         do {
-            var readCount = 0
+            let readCount = SharedMutableValue(0)
             _ = try await archive.extract(entry, bufferSize: 1, progress: progress) { (data) in
-                readCount += data.count
-                if readCount == 4 { progress.cancel() }
+                await readCount.increment(data.count)
+                if await readCount.get() == 4 { progress.cancel() }
             }
         } catch let error as Archive.ArchiveError {
             XCTAssert(error == Archive.ArchiveError.cancelledOperation)
@@ -235,10 +236,10 @@ extension ZIPFoundationTests {
         guard let entry = try await archive.get("random") else { XCTFail("Failed to extract entry."); return }
         let progress = archive.makeProgressForReading(entry)
         do {
-            var readCount = 0
+            let readCount = SharedMutableValue(0)
             _ = try await archive.extract(entry, bufferSize: 256, progress: progress) { (data) in
-                readCount += data.count
-                if readCount == 512 { progress.cancel() }
+                await readCount.increment(data.count)
+                if await readCount.get() == 512 { progress.cancel() }
             }
         } catch let error as Archive.ArchiveError {
             XCTAssert(error == Archive.ArchiveError.cancelledOperation)

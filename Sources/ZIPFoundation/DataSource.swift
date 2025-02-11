@@ -1,17 +1,44 @@
 //
-//  DataSource.swift
-//  ZIPFoundation
-//
-//  Created by Mickaël on 12/17/24.
+//  Copyright 2025 Readium Foundation. All rights reserved.
+//  Use of this source code is governed by the BSD-style license
+//  available in the top-level LICENSE file of the project.
 //
 
 import Foundation
 
-/// A ``DataSource`` abstract the access to the ZIP data.
-public protocol DataSource {
+public enum DataSourceError: Error {
+    case notWritable
+    case unexpectedDataLength
+}
+
+public protocol DataSource: Sendable {
     
     /// Gets the total length of the source, if known.
     func length() async throws -> UInt64
+    
+    /// Indicates whether the ``DataSource`` can be modified using `openWrite`.
+    var isWritable: Bool { get }
+    
+    /// Opens a transaction to read data from the source.
+    ///
+    /// You **must** call `transaction.close()` when you are done.
+    func openRead() async throws -> DataSourceTransaction
+    
+    /// Opens a transaction to modify the source.
+    ///
+    /// You **must** call `transaction.close()` when you are done.
+    func openWrite() async throws -> WritableDataSourceTransaction
+}
+
+extension DataSource {
+    
+    public func openWrite() async throws -> WritableDataSourceTransaction {
+        throw DataSourceError.notWritable
+    }
+}
+
+/// A ``DataSource`` abstract the access to the ZIP data.
+public protocol DataSourceTransaction: Sendable {
 
     /// Gets the current offset position.
     func position() async throws -> UInt64
@@ -21,12 +48,9 @@ public protocol DataSource {
     
     /// Reads the requested `length` amount of data.
     func read(length: Int) async throws -> Data
-    
-    /// Closes the underlying handles.
-    func close() throws
 }
 
-public protocol WritableDataSource: DataSource {
+public protocol WritableDataSourceTransaction: DataSourceTransaction {
     
     /// Writes the given `data` at the current position.
     func write(_ data: Data) async throws
@@ -40,11 +64,7 @@ public protocol WritableDataSource: DataSource {
     func flush() async throws
 }
 
-public enum DataSourceError: Error {
-    case unexpectedDataLength
-}
-
-extension DataSource {
+extension DataSourceTransaction {
     
     /// Reads a single int from the data.
     func readInt() async throws -> UInt32 {

@@ -10,7 +10,7 @@
 
 import Foundation
 
-protocol ExtensibleDataField {
+protocol ExtensibleDataField: Sendable {
     var headerID: UInt16 { get }
     var dataSize: UInt16 { get }
 }

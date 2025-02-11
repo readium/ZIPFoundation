@@ -29,7 +29,7 @@ extension Archive {
         guard bufferSize > 0 else {
             throw ArchiveError.invalidBufferSize
         }
-        let fileManager = FileManager()
+        let fileManager = FileManager.default
         var checksum = CRC32(0)
         switch entry.type {
         case .file:
@@ -42,12 +42,12 @@ extension Archive {
                 throw POSIXError(errno, path: url.path)
             }
             defer { fclose(destinationFile) }
-            let consumer = { _ = try Data.write(chunk: $0, to: destinationFile) }
+            let consumer = { @Sendable in _ = try Data.write(chunk: $0, to: destinationFile) }
             checksum = try await self.extract(entry, bufferSize: bufferSize, skipCRC32: skipCRC32,
                                         progress: progress, consumer: consumer)
         case .directory:
-            let consumer = { (_: Data) in
-                try fileManager.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
+            let consumer = { @Sendable (_: Data) in
+                try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
             }
             checksum = try await self.extract(entry, bufferSize: bufferSize, skipCRC32: skipCRC32,
                                         progress: progress, consumer: consumer)
@@ -55,7 +55,7 @@ extension Archive {
             guard fileManager.itemExists(at: url) == false else {
                 throw CocoaError(.fileWriteFileExists, userInfo: [NSFilePathErrorKey: url.path])
             }
-            let consumer = { (data: Data) in
+            let consumer = { @Sendable (data: Data) in
                 guard let linkPath = String(data: data, encoding: .utf8) else { throw ArchiveError.invalidEntryPath }
 
                 let parentURL = url.deletingLastPathComponent()
@@ -64,6 +64,7 @@ extension Archive {
                 let isContained = allowUncontainedSymlinks || linkURL.isContained(in: parentURL)
                 guard isContained else { throw ArchiveError.uncontainedSymlink }
 
+                let fileManager = FileManager.default
                 try fileManager.createParentDirectoryStructure(for: url)
                 try fileManager.createSymbolicLink(atPath: url.path, withDestinationPath: linkPath)
             }
@@ -90,10 +91,12 @@ extension Archive {
         guard bufferSize > 0 else {
             throw ArchiveError.invalidBufferSize
         }
-        var checksum = CRC32(0)
         let localFileHeader = entry.localFileHeader
         guard entry.dataOffset <= .max else { throw ArchiveError.invalidLocalHeaderDataOffset }
-        try await dataSource.seek(to: entry.dataOffset)
+        
+        let transaction = try await dataSource.openRead()
+        var checksum = CRC32(0)
+        try await transaction.seek(to: entry.dataOffset)
         progress?.totalUnitCount = self.totalUnitCountForReading(entry)
         switch entry.type {
         case .file:
@@ -101,10 +104,25 @@ extension Archive {
                 throw ArchiveError.invalidCompressionMethod
             }
             switch compressionMethod {
-            case .none: checksum = try await self.readUncompressed(entry: entry, bufferSize: bufferSize,
-                                                             skipCRC32: skipCRC32, progress: progress, with: consumer)
-            case .deflate: checksum = try await self.readCompressed(entry: entry, bufferSize: bufferSize,
-                                                              skipCRC32: skipCRC32, progress: progress, with: consumer)
+            case .none:
+                checksum = try await self.readUncompressed(
+                    transaction: transaction,
+                    entry: entry,
+                    bufferSize: bufferSize,
+                    skipCRC32: skipCRC32,
+                    progress: progress,
+                    with: consumer
+                )
+                
+            case .deflate:
+                checksum = try await self.readCompressed(
+                    transaction: transaction,
+                    entry: entry,
+                    bufferSize: bufferSize,
+                    skipCRC32: skipCRC32,
+                    progress: progress,
+                    with: consumer
+                )
             }
         case .directory:
             try await consumer(Data())
@@ -112,7 +130,7 @@ extension Archive {
         case .symlink:
             let localFileHeader = entry.localFileHeader
             let size = Int(localFileHeader.compressedSize)
-            let data = try await dataSource.read(length: size)
+            let data = try await transaction.read(length: size)
             checksum = data.crc32(checksum: 0)
             try await consumer(data)
             progress?.completedUnitCount = self.totalUnitCountForReading(entry)
@@ -170,14 +188,15 @@ extension Archive {
         bufferSize: Int,
         consumer: Consumer
     ) async throws {
-        try await dataSource.seek(to: entry.dataOffset + range.lowerBound)
+        let transaction = try await dataSource.openRead()
+        try await transaction.seek(to: entry.dataOffset + range.lowerBound)
         
         _ = try await Data.consumePart(
             of: Int64(range.count),
             chunkSize: bufferSize,
             skipCRC32: true,
             provider: { pos, chunkSize -> Data in
-                try await dataSource.read(length: chunkSize)
+                try await transaction.read(length: chunkSize)
             },
             consumer: consumer
         )
@@ -191,18 +210,21 @@ extension Archive {
         bufferSize: Int,
         consumer: Consumer
     ) async throws {
-        var bytesRead: UInt64 = 0
+        let transaction = try await dataSource.openRead()
+        let bytesReadCounter = SharedMutableValue<UInt64>()
         
         do {
-            try await dataSource.seek(to: entry.dataOffset)
+            try await transaction.seek(to: entry.dataOffset)
             
             _ = try await readCompressed(
+                transaction: transaction,
                 entry: entry,
                 bufferSize: bufferSize,
                 skipCRC32: true
             ) { chunk in
                 let chunkSize = UInt64(chunk.count)
                 
+                let bytesRead = await bytesReadCounter.get()
                 if bytesRead >= range.lowerBound {
                     if bytesRead + chunkSize > range.upperBound {
                         let remainingBytes = range.upperBound - bytesRead
@@ -217,9 +239,9 @@ extension Archive {
                     try await consumer(chunk[start..<end])
                 }
                 
-                bytesRead += chunkSize
+                await bytesReadCounter.increment(chunkSize)
                 
-                guard bytesRead < range.upperBound else {
+                guard await bytesReadCounter.get() < range.upperBound else {
                     throw EndOfRange()
                 }
             }

@@ -51,7 +51,7 @@ extension Archive {
     public func addEntry(with path: String, fileURL: URL, compressionMethod: CompressionMethod = .none,
                          bufferSize: Int = defaultWriteChunkSize, progress: Progress? = nil) async throws {
         guard let url = self.url else { throw ArchiveError.unwritableArchive }
-        let fileManager = FileManager()
+        let fileManager = FileManager.default
         guard fileManager.itemExists(at: fileURL) else {
             throw CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: fileURL.path])
         }
@@ -84,7 +84,8 @@ extension Archive {
                               compressionMethod: compressionMethod, bufferSize: bufferSize,
                               progress: progress, provider: provider)
         case .symlink:
-            provider = { _, _ -> Data in
+            provider = { @Sendable _, _ -> Data in
+                let fileManager = FileManager.default
                 let linkDestination = try fileManager.destinationOfSymbolicLink(atPath: fileURL.path)
                 let linkFileSystemRepresentation = fileManager.fileSystemRepresentation(withPath: linkDestination)
                 let linkLength = Int(strlen(linkFileSystemRepresentation))
@@ -118,54 +119,76 @@ extension Archive {
                          modificationDate: Date = Date(), permissions: UInt16? = nil,
                          compressionMethod: CompressionMethod = .none, bufferSize: Int = defaultWriteChunkSize,
                          progress: Progress? = nil, provider: Provider) async throws {
-        guard self.accessMode != .read, let dataSource = dataSource as? WritableDataSource else { throw ArchiveError.unwritableArchive }
+        guard
+            accessMode != .read,
+            dataSource.isWritable
+        else {
+            throw ArchiveError.unwritableArchive
+        }
+        
+        let transaction = try await dataSource.openWrite()
         // Directories and symlinks cannot be compressed
         let compressionMethod = type == .file ? compressionMethod : .none
         progress?.totalUnitCount = type == .directory ? defaultDirectoryUnitCount : uncompressedSize
         let (eocdRecord, zip64EOCD) = (self.endOfCentralDirectoryRecord, self.zip64EndOfCentralDirectory)
         guard self.offsetToStartOfCentralDirectory <= .max else { throw ArchiveError.invalidCentralDirectoryOffset }
         var startOfCD = self.offsetToStartOfCentralDirectory
-        try await dataSource.seek(to: startOfCD)
+        try await transaction.seek(to: startOfCD)
         let existingSize = self.sizeOfCentralDirectory
-        let existingData = try await dataSource.read(length: Int(existingSize))
-        try await dataSource.seek(to: startOfCD)
-        let fileHeaderStart = try await dataSource.position()
+        let existingData = try await transaction.read(length: Int(existingSize))
+        try await transaction.seek(to: startOfCD)
+        let fileHeaderStart = try await transaction.position()
         let modDateTime = modificationDate.fileModificationDateTime
         
         do {
             // Local File Header
-            var localFileHeader = try await self.writeLocalFileHeader(path: path, compressionMethod: compressionMethod,
-                                                                size: (UInt64(uncompressedSize), 0), checksum: 0,
-                                                                modificationDateTime: modDateTime)
+            var localFileHeader = try await self.writeLocalFileHeader(
+                transaction: transaction,
+                path: path, compressionMethod: compressionMethod,
+                size: (UInt64(uncompressedSize), 0), checksum: 0,
+                modificationDateTime: modDateTime
+            )
             // File Data
-            let (written, checksum) = try await self.writeEntry(uncompressedSize: uncompressedSize, type: type,
-                                                          compressionMethod: compressionMethod, bufferSize: bufferSize,
-                                                          progress: progress, provider: provider)
-            startOfCD = try await dataSource.position()
+            let (written, checksum) = try await self.writeEntry(
+                transaction: transaction,
+                uncompressedSize: uncompressedSize, type: type,
+                compressionMethod: compressionMethod, bufferSize: bufferSize,
+                progress: progress, provider: provider
+            )
+            startOfCD = try await transaction.position()
             // Write the local file header a second time. Now with compressedSize (if applicable) and a valid checksum.
-            try await dataSource.seek(to: fileHeaderStart)
-            localFileHeader = try await self.writeLocalFileHeader(path: path, compressionMethod: compressionMethod,
-                                                            size: (UInt64(uncompressedSize), UInt64(written)),
-                                                            checksum: checksum, modificationDateTime: modDateTime)
+            try await transaction.seek(to: fileHeaderStart)
+            localFileHeader = try await self.writeLocalFileHeader(
+                transaction: transaction,
+                path: path, compressionMethod: compressionMethod,
+                size: (UInt64(uncompressedSize), UInt64(written)),
+                checksum: checksum, modificationDateTime: modDateTime
+            )
             // Central Directory
-            try await dataSource.seek(to: startOfCD)
-            try await dataSource.writeLargeChunk(existingData, size: existingSize, bufferSize: bufferSize)
+            try await transaction.seek(to: startOfCD)
+            try await transaction.writeLargeChunk(existingData, size: existingSize, bufferSize: bufferSize)
             let permissions = permissions ?? (type == .directory ? defaultDirectoryPermissions : defaultFilePermissions)
             let externalAttributes = FileManager.externalFileAttributesForEntry(of: type, permissions: permissions)
-            let centralDir = try await self.writeCentralDirectoryStructure(localFileHeader: localFileHeader,
-                                                                     relativeOffset: UInt64(fileHeaderStart),
-                                                                     externalFileAttributes: externalAttributes)
+            let centralDir = try await self.writeCentralDirectoryStructure(
+                transaction: transaction,
+                localFileHeader: localFileHeader,
+                relativeOffset: UInt64(fileHeaderStart),
+                externalFileAttributes: externalAttributes
+            )
             // End of Central Directory Record (including ZIP64 End of Central Directory Record/Locator)
-            let startOfEOCD = try await dataSource.position()
-            let eocd = try await self.writeEndOfCentralDirectory(centralDirectoryStructure: centralDir,
-                                                           startOfCentralDirectory: UInt64(startOfCD),
-                                                           startOfEndOfCentralDirectory: startOfEOCD, operation: .add)
-            (self.endOfCentralDirectoryRecord, self.zip64EndOfCentralDirectory) = eocd
+            let startOfEOCD = try await transaction.position()
+            let eocd = try await self.writeEndOfCentralDirectory(
+                transaction: transaction,
+                centralDirectoryStructure: centralDir,
+                startOfCentralDirectory: UInt64(startOfCD),
+                startOfEndOfCentralDirectory: startOfEOCD, operation: .add
+            )
+            self.setEndOfCentralDirectory(eocd)
             
-            try await dataSource.flush()
+            try await transaction.flush()
             
         } catch ArchiveError.cancelledOperation {
-            try await rollback(UInt64(fileHeaderStart), (existingData, existingSize), bufferSize, eocdRecord, zip64EOCD)
+            try await rollback(transaction, UInt64(fileHeaderStart), (existingData, existingSize), bufferSize, eocdRecord, zip64EOCD)
             throw ArchiveError.cancelledOperation
         }
     }
@@ -178,8 +201,16 @@ extension Archive {
     ///   - progress: A progress object that can be used to track or cancel the remove operation.
     /// - Throws: An error if the `Entry` is malformed or the receiver is not writable.
     public func remove(_ entry: Entry, bufferSize: Int = defaultReadChunkSize, progress: Progress? = nil) async throws {
-        guard self.accessMode != .read, let dataSource = dataSource as? WritableDataSource else { throw ArchiveError.unwritableArchive }
+        guard
+            accessMode != .read,
+            dataSource.isWritable
+        else {
+            throw ArchiveError.unwritableArchive
+        }
+        
+        let transaction = try await dataSource.openWrite()
         let (tempArchive, tempDir) = try await self.makeTempArchive()
+        let tempTransaction = try await tempArchive.dataSource.openWrite()
         defer { tempDir.map { try? FileManager().removeItem(at: $0) } }
         progress?.totalUnitCount = self.totalUnitCountForRemoving(entry)
         var centralDirectoryData = Data()
@@ -188,44 +219,43 @@ extension Archive {
             let cds = currentEntry.centralDirectoryStructure
             if currentEntry != entry {
                 let entryStart = cds.effectiveRelativeOffsetOfLocalHeader
-                try await dataSource.seek(to: entryStart)
+                try await transaction.seek(to: entryStart)
                 let provider: Provider = { (_, chunkSize) -> Data in
-                    try await dataSource.read(length: chunkSize)
+                    try await transaction.read(length: chunkSize)
                 }
-                let consumer: Consumer = {
+                let consumer: Consumer = { data in
                     if progress?.isCancelled == true { throw ArchiveError.cancelledOperation }
-                    try await tempArchive.writableDataSource.write($0)
-                    progress?.completedUnitCount += Int64($0.count)
+                    try await tempTransaction.write(data)
+                    progress?.completedUnitCount += Int64(data.count)
                 }
                 guard currentEntry.localSize <= .max else { throw ArchiveError.invalidLocalHeaderSize }
                 _ = try await Data.consumePart(of: Int64(currentEntry.localSize), chunkSize: bufferSize,
-                                         provider: provider, consumer: consumer)
+                                               provider: provider, consumer: consumer)
                 let updatedCentralDirectory = updateOffsetInCentralDirectory(centralDirectoryStructure: cds,
                                                                              updatedOffset: entryStart - offset)
                 centralDirectoryData.append(updatedCentralDirectory.data)
             } else { offset = currentEntry.localSize }
         }
-        let startOfCentralDirectory = try await tempArchive.dataSource.position()
-        try await tempArchive.writableDataSource.write(centralDirectoryData)
-        let startOfEndOfCentralDirectory = try await tempArchive.dataSource.position()
-        tempArchive.endOfCentralDirectoryRecord = self.endOfCentralDirectoryRecord
-        tempArchive.zip64EndOfCentralDirectory = self.zip64EndOfCentralDirectory
+        
+        let startOfCentralDirectory = try await tempTransaction.position()
+        try await tempTransaction.write(centralDirectoryData)
+        let startOfEndOfCentralDirectory = try await tempTransaction.position()
+        await tempArchive.setEndOfCentralDirectory(self.endOfCentralDirectory)
         let ecodStructure = try await tempArchive.writeEndOfCentralDirectory(
+            transaction: tempTransaction,
             centralDirectoryStructure: entry.centralDirectoryStructure,
             startOfCentralDirectory: startOfCentralDirectory,
             startOfEndOfCentralDirectory: startOfEndOfCentralDirectory,
             operation: .remove
         )
-        (tempArchive.endOfCentralDirectoryRecord, tempArchive.zip64EndOfCentralDirectory) = ecodStructure
-        (self.endOfCentralDirectoryRecord, self.zip64EndOfCentralDirectory) = ecodStructure
-        try await tempArchive.writableDataSource.flush()
+        await tempArchive.setEndOfCentralDirectory(ecodStructure)
+        self.setEndOfCentralDirectory(ecodStructure)
+        try await tempTransaction.flush()
         try await self.replaceCurrentArchive(with: tempArchive)
     }
 
     func replaceCurrentArchive(with archive: Archive) async throws {
         guard let url = self.url, let archiveURL = archive.url else { throw ArchiveError.unwritableArchive }
-        
-        try dataSource.close()
         
         let fileManager = FileManager()
 #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
@@ -239,7 +269,7 @@ extension Archive {
         _ = try fileManager.removeItem(at: url)
         _ = try fileManager.moveItem(at: archiveURL, to: url)
 #endif
-        self.dataSource = try await FileDataSource(url: url, mode: .write)
+        self.dataSource = try await FileDataSource(url: url, isWritable: true)
     }
 }
 
@@ -257,20 +287,28 @@ private extension Archive {
                                          relativeOffset: offsetInCD)
     }
 
-    func rollback(_ localFileHeaderStart: UInt64, _ existingCentralDirectory: (data: Data, size: UInt64),
-                  _ bufferSize: Int, _ endOfCentralDirRecord: EndOfCentralDirectoryRecord,
-                  _ zip64EndOfCentralDirectory: ZIP64EndOfCentralDirectory?) async throws {
-        try await writableDataSource.flush()
-        try await writableDataSource.truncate(to: localFileHeaderStart)
-        try await writableDataSource.seek(to: localFileHeaderStart)
-        try await writableDataSource.writeLargeChunk(existingCentralDirectory.data, size: existingCentralDirectory.size,
-                                     bufferSize: bufferSize)
-        try await writableDataSource.write(existingCentralDirectory.data)
+    func rollback(
+        _ transaction: WritableDataSourceTransaction,
+        _ localFileHeaderStart: UInt64,
+        _ existingCentralDirectory: (data: Data, size: UInt64),
+        _ bufferSize: Int,
+        _ endOfCentralDirRecord: EndOfCentralDirectoryRecord,
+        _ zip64EndOfCentralDirectory: ZIP64EndOfCentralDirectory?
+    ) async throws {
+        try await transaction.flush()
+        try await transaction.truncate(to: localFileHeaderStart)
+        try await transaction.seek(to: localFileHeaderStart)
+        try await transaction.writeLargeChunk(
+            existingCentralDirectory.data,
+            size: existingCentralDirectory.size,
+            bufferSize: bufferSize
+        )
+        try await transaction.write(existingCentralDirectory.data)
         if let zip64EOCD = zip64EndOfCentralDirectory {
-            try await writableDataSource.write(zip64EOCD.data)
+            try await transaction.write(zip64EOCD.data)
         }
-        try await writableDataSource.write(endOfCentralDirRecord.data)
-        try await writableDataSource.flush()
+        try await transaction.write(endOfCentralDirRecord.data)
+        try await transaction.flush()
     }
 
     func makeTempArchive() async throws -> (Archive, URL?) {
