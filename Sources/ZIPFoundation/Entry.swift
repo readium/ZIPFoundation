@@ -60,6 +60,8 @@ public struct Entry: Equatable, Sendable {
         let fileNameData: Data
         let extraFieldData: Data
         var extraFields: [ExtensibleDataField]?
+        var dataDescriptor: DefaultDataDescriptor?
+        var zip64DataDescriptor: ZIP64DataDescriptor?
     }
 
     struct DataDescriptor<T: BinaryInteger & Sendable>: DataSerializable, Sendable {
@@ -136,10 +138,7 @@ public struct Entry: Equatable, Sendable {
     ///
     /// - Note: Always returns `0` for entries of type `EntryType.directory`.
     public var checksum: CRC32 {
-        if self.centralDirectoryStructure.usesDataDescriptor {
-            return self.zip64DataDescriptor?.crc32 ?? self.dataDescriptor?.crc32 ?? 0
-        }
-        return self.centralDirectoryStructure.crc32
+        centralDirectoryStructure.crc32
     }
     /// The `EntryType` of the receiver.
     public var type: EntryType {
@@ -168,65 +167,56 @@ public struct Entry: Equatable, Sendable {
     }
     /// Indicates whether or not the receiver is compressed.
     public var isCompressed: Bool {
-        self.localFileHeader.compressionMethod != CompressionMethod.none.rawValue
+        centralDirectoryStructure.compressionMethod != CompressionMethod.none.rawValue
     }
     /// The size of the receiver's compressed data.
     public var compressedSize: UInt64 {
-        if centralDirectoryStructure.isZIP64 {
-            return zip64DataDescriptor?.compressedSize ?? centralDirectoryStructure.effectiveCompressedSize
-        }
-        return UInt64(dataDescriptor?.compressedSize ?? centralDirectoryStructure.compressedSize)
+        centralDirectoryStructure.isZIP64
+            ? centralDirectoryStructure.effectiveCompressedSize
+            : UInt64(centralDirectoryStructure.compressedSize)
     }
     /// The size of the receiver's uncompressed data.
     public var uncompressedSize: UInt64 {
-        if centralDirectoryStructure.isZIP64 {
-            return zip64DataDescriptor?.uncompressedSize ?? centralDirectoryStructure.effectiveUncompressedSize
-        }
-        return UInt64(dataDescriptor?.uncompressedSize ?? centralDirectoryStructure.uncompressedSize)
+        centralDirectoryStructure.isZIP64
+            ? centralDirectoryStructure.effectiveUncompressedSize
+            : UInt64(centralDirectoryStructure.uncompressedSize)
     }
     /// The combined size of the local header, the data and the optional data descriptor.
-    var localSize: UInt64 {
-        let localFileHeader = self.localFileHeader
+    func localSize(with localFileHeader: LocalFileHeader) throws -> UInt64 {
         var extraDataLength = Int(localFileHeader.fileNameLength)
         extraDataLength += Int(localFileHeader.extraFieldLength)
         var size = UInt64(LocalFileHeader.size + extraDataLength)
         size += self.isCompressed ? self.compressedSize : self.uncompressedSize
         if centralDirectoryStructure.isZIP64 {
-            size += self.zip64DataDescriptor != nil ? UInt64(ZIP64DataDescriptor.size) : 0
+            size += localFileHeader.zip64DataDescriptor != nil ? UInt64(ZIP64DataDescriptor.size) : 0
         } else {
-            size += self.dataDescriptor != nil ? UInt64(DefaultDataDescriptor.size) : 0
+            size += localFileHeader.dataDescriptor != nil ? UInt64(DefaultDataDescriptor.size) : 0
         }
+        guard size <= .max else { throw Archive.ArchiveError.invalidLocalHeaderSize }
         return size
     }
-    var dataOffset: UInt64 {
+    
+    func dataOffset(with localFileHeader: LocalFileHeader) throws -> UInt64 {
         var dataOffset = self.centralDirectoryStructure.effectiveRelativeOffsetOfLocalHeader
         dataOffset += UInt64(LocalFileHeader.size)
-        dataOffset += UInt64(self.localFileHeader.fileNameLength)
-        dataOffset += UInt64(self.localFileHeader.extraFieldLength)
+        dataOffset += UInt64(localFileHeader.fileNameLength)
+        dataOffset += UInt64(localFileHeader.extraFieldLength)
+        guard dataOffset <= .max else { throw Archive.ArchiveError.invalidLocalHeaderDataOffset }
         return dataOffset
     }
+    
     let centralDirectoryStructure: CentralDirectoryStructure
-    let localFileHeader: LocalFileHeader
-    let dataDescriptor: DefaultDataDescriptor?
-    let zip64DataDescriptor: ZIP64DataDescriptor?
 
     public static func == (lhs: Entry, rhs: Entry) -> Bool {
         return lhs.path == rhs.path
-            && lhs.localFileHeader.crc32 == rhs.localFileHeader.crc32
-            && lhs.centralDirectoryStructure.effectiveRelativeOffsetOfLocalHeader
-            == rhs.centralDirectoryStructure.effectiveRelativeOffsetOfLocalHeader
+            && lhs.checksum == rhs.checksum
+            && lhs.centralDirectoryStructure.effectiveRelativeOffsetOfLocalHeader == rhs.centralDirectoryStructure.effectiveRelativeOffsetOfLocalHeader
     }
 
-    init?(centralDirectoryStructure: CentralDirectoryStructure,
-          localFileHeader: LocalFileHeader,
-          dataDescriptor: DefaultDataDescriptor? = nil,
-          zip64DataDescriptor: ZIP64DataDescriptor? = nil) {
+    init?(centralDirectoryStructure: CentralDirectoryStructure) {
         // We currently don't support encrypted archives
         guard !centralDirectoryStructure.isEncrypted else { return nil }
         self.centralDirectoryStructure = centralDirectoryStructure
-        self.localFileHeader = localFileHeader
-        self.dataDescriptor = dataDescriptor
-        self.zip64DataDescriptor = zip64DataDescriptor
     }
 }
 

@@ -208,11 +208,12 @@ extension Archive {
             throw ArchiveError.unwritableArchive
         }
         
+        let localFileHeader = try await localFileHeader(for: entry)
         let transaction = try await dataSource.openWrite()
         let (tempArchive, tempDir) = try await self.makeTempArchive()
         let tempTransaction = try await tempArchive.dataSource.openWrite()
         defer { tempDir.map { try? FileManager().removeItem(at: $0) } }
-        progress?.totalUnitCount = self.totalUnitCountForRemoving(entry)
+        progress?.totalUnitCount = try self.totalUnitCountForRemoving(entry, localFileHeader: localFileHeader)
         var centralDirectoryData = Data()
         var offset: UInt64 = 0
         for try await currentEntry in self {
@@ -228,13 +229,15 @@ extension Archive {
                     try await tempTransaction.write(data)
                     progress?.completedUnitCount += Int64(data.count)
                 }
-                guard currentEntry.localSize <= .max else { throw ArchiveError.invalidLocalHeaderSize }
-                _ = try await Data.consumePart(of: Int64(currentEntry.localSize), chunkSize: bufferSize,
+                let localSize = try currentEntry.localSize(with: localFileHeader)
+                _ = try await Data.consumePart(of: Int64(localSize), chunkSize: bufferSize,
                                                provider: provider, consumer: consumer)
                 let updatedCentralDirectory = updateOffsetInCentralDirectory(centralDirectoryStructure: cds,
                                                                              updatedOffset: entryStart - offset)
                 centralDirectoryData.append(updatedCentralDirectory.data)
-            } else { offset = currentEntry.localSize }
+            } else {
+                offset = try currentEntry.localSize(with: localFileHeader)
+            }
         }
         
         let startOfCentralDirectory = try await tempTransaction.position()

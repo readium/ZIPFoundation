@@ -108,7 +108,7 @@ extension ZIPFoundationTests {
                                               }) else {
             XCTFail("Failed to read local file header."); return
         }
-        guard let entry = Entry(centralDirectoryStructure: cds, localFileHeader: lfh) else {
+        guard let entry = Entry(centralDirectoryStructure: cds) else {
             XCTFail("Failed to create test entry."); return
         }
         XCTAssertNotNil(entry.zip64ExtendedInformation)

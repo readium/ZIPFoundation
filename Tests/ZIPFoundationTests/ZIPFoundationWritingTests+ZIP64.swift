@@ -38,7 +38,8 @@ extension ZIPFoundationTests {
         do {
             // Local File Header and Extra Field
             fseeko(archiveFile, 0, SEEK_SET)
-            let lfhSize = checkLocalFileHeaderAndExtraField(entry: entry, dataSize: size,
+            let lfh = try await archive.localFileHeader(for: entry)
+            let lfhSize = checkLocalFileHeaderAndExtraField(header: lfh, dataSize: size,
                                                             entryNameLength: entryName.count) { size in
                 try Data.readChunk(of: size, from: archiveFile)
             }
@@ -69,12 +70,12 @@ extension ZIPFoundationTests {
         }
     }
 
-    private func checkLocalFileHeaderAndExtraField(entry: Entry, dataSize: UInt64, entryNameLength: Int,
+    private func checkLocalFileHeaderAndExtraField(header: Entry.LocalFileHeader, dataSize: UInt64, entryNameLength: Int,
                                                    readData: (Int) throws -> Data) -> UInt64 {
-        XCTAssertEqual(entry.localFileHeader.uncompressedSize, UInt32.max)
-        XCTAssertEqual(entry.localFileHeader.extraFieldData.scanValue(start: 4), dataSize)
-        XCTAssertEqual(entry.localFileHeader.compressedSize, UInt32.max)
-        XCTAssertEqual(entry.localFileHeader.extraFieldData.scanValue(start: 12), dataSize)
+        XCTAssertEqual(header.uncompressedSize, UInt32.max)
+        XCTAssertEqual(header.extraFieldData.scanValue(start: 4), dataSize)
+        XCTAssertEqual(header.compressedSize, UInt32.max)
+        XCTAssertEqual(header.extraFieldData.scanValue(start: 12), dataSize)
         do {
             let lfhExtraFieldOffset = 30 + entryNameLength
             let lfhSize = lfhExtraFieldOffset + 20

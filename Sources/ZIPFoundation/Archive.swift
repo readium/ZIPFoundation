@@ -79,6 +79,8 @@ public actor Archive: AsyncSequence {
         case invalidBufferSize
         /// Thrown when uncompressedSize/compressedSize exceeds `Int64.max` (Imposed by file API).
         case invalidEntrySize
+        /// Thrown when the local header cannot be found.
+        case localHeaderNotFound
         /// Thrown when the offset of local header data exceeds `Int64.max` (Imposed by file API).
         case invalidLocalHeaderDataOffset
         /// Thrown when the size of local header exceeds `Int64.max` (Imposed by file API).
@@ -250,23 +252,6 @@ public actor Archive: AsyncSequence {
                 guard let centralDirStruct: CentralDirectoryStructure = try await dataSource.readStruct(at: directoryIndex) else {
                     return nil
                 }
-                let offset = UInt64(centralDirStruct.effectiveRelativeOffsetOfLocalHeader)
-                guard let localFileHeader: LocalFileHeader = try await dataSource.readStruct(at: offset) else { return nil }
-                var dataDescriptor: DataDescriptor?
-                var zip64DataDescriptor: ZIP64DataDescriptor?
-                if centralDirStruct.usesDataDescriptor {
-                    let additionalSize = UInt64(localFileHeader.fileNameLength) + UInt64(localFileHeader.extraFieldLength)
-                    let isCompressed = centralDirStruct.compressionMethod != CompressionMethod.none.rawValue
-                    let dataSize = isCompressed
-                    ? centralDirStruct.effectiveCompressedSize
-                    : centralDirStruct.effectiveUncompressedSize
-                    let descriptorPosition = offset + UInt64(LocalFileHeader.size) + additionalSize + dataSize
-                    if centralDirStruct.isZIP64 {
-                        zip64DataDescriptor = try await dataSource.readStruct(at: descriptorPosition)
-                    } else {
-                        dataDescriptor = try await dataSource.readStruct(at: descriptorPosition)
-                    }
-                }
                 defer {
                     directoryIndex += UInt64(CentralDirectoryStructure.size)
                     directoryIndex += UInt64(centralDirStruct.fileNameLength)
@@ -274,8 +259,7 @@ public actor Archive: AsyncSequence {
                     directoryIndex += UInt64(centralDirStruct.fileCommentLength)
                     index += 1
                 }
-                return Entry(centralDirectoryStructure: centralDirStruct, localFileHeader: localFileHeader,
-                             dataDescriptor: dataDescriptor, zip64DataDescriptor: zip64DataDescriptor)
+                return Entry(centralDirectoryStructure: centralDirStruct)
             } catch {
                 return nil
             }
@@ -295,6 +279,36 @@ public actor Archive: AsyncSequence {
             return try await self.first { $0.path(using: encoding) == path }
         }
         return try await self.first { $0.path == path }
+    }
+    
+    func localFileHeader(for entry: Entry) async throws -> LocalFileHeader {
+        let transaction = try await dataSource.openRead()
+        let centralDirStruct = entry.centralDirectoryStructure
+        let offset = UInt64(centralDirStruct.effectiveRelativeOffsetOfLocalHeader)
+        guard
+            var localFileHeader: LocalFileHeader = try await transaction.readStruct(at: offset)
+        else {
+            throw Archive.ArchiveError.localHeaderNotFound
+        }
+        
+        /// We only load the data descriptors if we are in writing mode, because
+        /// they might need to be written over. In read mode it is is
+        /// superfluous as the same infos are in the central directory structure.
+        if centralDirStruct.usesDataDescriptor && accessMode != .read {
+            let additionalSize = UInt64(localFileHeader.fileNameLength) + UInt64(localFileHeader.extraFieldLength)
+            let isCompressed = centralDirStruct.compressionMethod != CompressionMethod.none.rawValue
+            let dataSize = isCompressed
+            ? centralDirStruct.effectiveCompressedSize
+            : centralDirStruct.effectiveUncompressedSize
+            let descriptorPosition = offset + UInt64(LocalFileHeader.size) + additionalSize + dataSize
+            if centralDirStruct.isZIP64 {
+                localFileHeader.zip64DataDescriptor = try await transaction.readStruct(at: descriptorPosition)
+            } else {
+                localFileHeader.dataDescriptor = try await transaction.readStruct(at: descriptorPosition)
+            }
+        }
+        
+        return localFileHeader
     }
 
     // MARK: - Helpers

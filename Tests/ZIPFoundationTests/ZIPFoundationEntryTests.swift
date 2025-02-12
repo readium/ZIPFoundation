@@ -106,11 +106,11 @@ extension ZIPFoundationTests {
             XCTFail("Failed to read central directory structure.")
             return
         }
-        guard let local = lfh else {
+        guard lfh != nil else {
             XCTFail("Failed to read local file header.")
             return
         }
-        guard let entry = Entry(centralDirectoryStructure: central, localFileHeader: local) else {
+        guard let entry = Entry(centralDirectoryStructure: central) else {
             XCTFail("Failed to read entry.")
             return
         }
@@ -138,11 +138,11 @@ extension ZIPFoundationTests {
             XCTFail("Failed to read central directory structure.")
             return
         }
-        guard let local = lfh else {
+        guard lfh != nil else {
             XCTFail("Failed to read local file header.")
             return
         }
-        guard let entry = Entry(centralDirectoryStructure: central, localFileHeader: local) else {
+        guard let entry = Entry(centralDirectoryStructure: central) else {
             XCTFail("Failed to read entry.")
             return
         }
@@ -174,11 +174,11 @@ extension ZIPFoundationTests {
             XCTFail("Failed to read central directory structure.")
             return
         }
-        guard let local = lfh else {
+        guard lfh != nil else {
             XCTFail("Failed to read local file header.")
             return
         }
-        guard let entry = Entry(centralDirectoryStructure: central, localFileHeader: local) else {
+        guard let entry = Entry(centralDirectoryStructure: central) else {
             XCTFail("Failed to read entry.")
             return
         }
