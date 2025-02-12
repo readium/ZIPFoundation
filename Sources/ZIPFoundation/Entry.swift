@@ -62,6 +62,14 @@ public struct Entry: Equatable, Sendable {
         var extraFields: [ExtensibleDataField]?
         var dataDescriptor: DefaultDataDescriptor?
         var zip64DataDescriptor: ZIP64DataDescriptor?
+        
+        var checksum: CRC32 {
+            if crc32 > 0 {
+                return crc32
+            } else {
+                return zip64DataDescriptor?.crc32 ?? dataDescriptor?.crc32 ?? 0
+            }
+        }
     }
 
     struct DataDescriptor<T: BinaryInteger & Sendable>: DataSerializable, Sendable {

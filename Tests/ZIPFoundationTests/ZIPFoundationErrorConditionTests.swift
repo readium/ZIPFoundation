@@ -74,8 +74,11 @@ extension ZIPFoundationTests {
             try invalidLocalFHArchiveData.write(to: invalidLocalFHArchiveURL)
             let invalidLocalFHArchive = try await Archive(url: invalidLocalFHArchiveURL,
                                                     accessMode: .read)
-            for try await _ in invalidLocalFHArchive {
-                didFailToMakeIteratorAsExpected = false
+            for try await entry in invalidLocalFHArchive {
+                do {
+                    let localFile = try await invalidLocalFHArchive.localFileHeader(for: entry)
+                    didFailToMakeIteratorAsExpected = false
+                } catch {}
             }
         } catch {
             XCTFail("Unexpected error while testing iterator error conditions.")

@@ -76,11 +76,12 @@ extension ZIPFoundationTests {
     }
 
     func testExtractCompressedDataDescriptorArchive() async throws {
-        let archive = await self.archive(for: #function, mode: .read)
+        let archive = await self.archive(for: #function, mode: .update)
         for try await entry in archive {
             do {
                 let checksum = try await archive.extract(entry, consumer: { _ in })
-                XCTAssert(entry.checksum == checksum)
+                let lfh = try await archive.localFileHeader(for: entry)
+                XCTAssert(lfh.checksum == checksum)
             } catch {
                 XCTFail("Failed to unzip data descriptor archive")
             }

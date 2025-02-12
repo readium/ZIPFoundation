@@ -208,15 +208,16 @@ extension Archive {
             throw ArchiveError.unwritableArchive
         }
         
-        let localFileHeader = try await localFileHeader(for: entry)
+        let lfh = try await localFileHeader(for: entry)
         let transaction = try await dataSource.openWrite()
         let (tempArchive, tempDir) = try await self.makeTempArchive()
         let tempTransaction = try await tempArchive.dataSource.openWrite()
         defer { tempDir.map { try? FileManager().removeItem(at: $0) } }
-        progress?.totalUnitCount = try self.totalUnitCountForRemoving(entry, localFileHeader: localFileHeader)
+        progress?.totalUnitCount = try self.totalUnitCountForRemoving(entry, localFileHeader: lfh)
         var centralDirectoryData = Data()
         var offset: UInt64 = 0
         for try await currentEntry in self {
+            let currentEntryLFH = try await localFileHeader(for: currentEntry)
             let cds = currentEntry.centralDirectoryStructure
             if currentEntry != entry {
                 let entryStart = cds.effectiveRelativeOffsetOfLocalHeader
@@ -229,14 +230,14 @@ extension Archive {
                     try await tempTransaction.write(data)
                     progress?.completedUnitCount += Int64(data.count)
                 }
-                let localSize = try currentEntry.localSize(with: localFileHeader)
+                let localSize = try currentEntry.localSize(with: currentEntryLFH)
                 _ = try await Data.consumePart(of: Int64(localSize), chunkSize: bufferSize,
                                                provider: provider, consumer: consumer)
                 let updatedCentralDirectory = updateOffsetInCentralDirectory(centralDirectoryStructure: cds,
                                                                              updatedOffset: entryStart - offset)
                 centralDirectoryData.append(updatedCentralDirectory.data)
             } else {
-                offset = try currentEntry.localSize(with: localFileHeader)
+                offset = try currentEntry.localSize(with: currentEntryLFH)
             }
         }
         
