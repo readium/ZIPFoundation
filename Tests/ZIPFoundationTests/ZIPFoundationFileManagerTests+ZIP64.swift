@@ -129,7 +129,7 @@ extension ZIPFoundationTests {
             throw ZIP64FileManagerTestsError.failedToUnzipItem
         }
         var itemsExist = false
-        for try await entry in archive {
+        for entry in try await archive.entries() {
             let directoryURL = destinationURL.appendingPathComponent(entry.path)
             itemsExist = fileManager.itemExists(at: directoryURL)
             if !itemsExist { break }

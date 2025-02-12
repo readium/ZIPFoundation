@@ -95,7 +95,7 @@ extension ZIPFoundationTests {
             XCTFail("Failed to extract item."); return
         }
         var itemsExist = false
-        for try await entry in archive {
+        for entry in try await archive.entries() {
             let directoryURL = destinationURL.appendingPathComponent(entry.path)
             itemsExist = fileManager.itemExists(at: directoryURL)
             if itemsExist == false { break }
@@ -114,7 +114,7 @@ extension ZIPFoundationTests {
             XCTFail("Failed to extract item."); return
         }
         var itemsExist = false
-        for try await entry in archive {
+        for entry in try await archive.entries() {
             let directoryURL = destinationURL.appendingPathComponent(entry.path(using: encoding))
             itemsExist = fileManager.itemExists(at: directoryURL)
             if !itemsExist { break }

@@ -102,10 +102,10 @@ extension ZIPFoundationTests {
                                  0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                  0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x0a, 0x00,
                                  0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-        guard let lfh = await Entry.LocalFileHeader(data: Data(lfhBytes),
+        guard await Entry.LocalFileHeader(data: Data(lfhBytes),
                                               additionalDataProvider: { _ -> Data in
                                                 return Data()
-                                              }) else {
+                                              }) != nil else {
             XCTFail("Failed to read local file header."); return
         }
         guard let entry = Entry(centralDirectoryStructure: cds) else {

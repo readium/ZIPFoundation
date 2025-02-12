@@ -101,11 +101,11 @@ extension FileManager {
         let archive = try await Archive(url: sourceURL, accessMode: .read, pathEncoding: pathEncoding)
         var totalUnitCount = Int64(0)
         if let progress = progress {
-            totalUnitCount = try await archive.reduce(0, { $0 + archive.totalUnitCountForReading($1) })
+            totalUnitCount = try await archive.entries().reduce(0, { $0 + archive.totalUnitCountForReading($1) })
             progress.totalUnitCount = totalUnitCount
         }
 
-        for try await entry in archive {
+        for entry in try await archive.entries() {
             let path = pathEncoding == nil ? entry.path : entry.path(using: pathEncoding!)
             let entryURL = destinationURL.appendingPathComponent(path)
             guard entryURL.isContained(in: destinationURL) else {

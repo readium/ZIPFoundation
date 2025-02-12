@@ -97,6 +97,8 @@ extension Archive {
                               compressionMethod: compressionMethod, bufferSize: bufferSize,
                               progress: progress, provider: provider)
         }
+        
+        didWrite()
     }
 
     /// Write files, directories or symlinks to the receiver.
@@ -191,6 +193,8 @@ extension Archive {
             try await rollback(transaction, UInt64(fileHeaderStart), (existingData, existingSize), bufferSize, eocdRecord, zip64EOCD)
             throw ArchiveError.cancelledOperation
         }
+        
+        didWrite()
     }
 
     /// Remove a ZIP `Entry` from the receiver.
@@ -216,7 +220,7 @@ extension Archive {
         progress?.totalUnitCount = try self.totalUnitCountForRemoving(entry, localFileHeader: lfh)
         var centralDirectoryData = Data()
         var offset: UInt64 = 0
-        for try await currentEntry in self {
+        for currentEntry in try await entries() {
             let currentEntryLFH = try await localFileHeader(for: currentEntry)
             let cds = currentEntry.centralDirectoryStructure
             if currentEntry != entry {
@@ -256,6 +260,8 @@ extension Archive {
         self.setEndOfCentralDirectory(ecodStructure)
         try await tempTransaction.flush()
         try await self.replaceCurrentArchive(with: tempArchive)
+        
+        didWrite()
     }
 
     func replaceCurrentArchive(with archive: Archive) async throws {
@@ -274,6 +280,8 @@ extension Archive {
         _ = try fileManager.moveItem(at: archiveURL, to: url)
 #endif
         self.dataSource = try await FileDataSource(url: url, isWritable: true)
+        
+        didWrite()
     }
 }
 
