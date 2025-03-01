@@ -2,9 +2,9 @@ name: Swift
 
 on:
   push:
-    branches: [development]
+    branches: [development, develop]
   pull_request:
-    branches: [development]
+    branches: [development, develop]
 
 jobs:
   Xcode:
