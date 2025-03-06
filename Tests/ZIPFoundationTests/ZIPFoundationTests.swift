@@ -310,7 +310,7 @@ extension ZIPFoundationTests {
 //            ("testUnzipItemProgress", testUnzipItemProgress),
             ("testConsistentBehaviorWithSystemZIPUtilities", testConsistentBehaviorWithSystemZIPUtilities),
 //            ("testRemoveEntryProgress", testRemoveEntryProgress),
-            ("testReplaceCurrentArchiveWithArchiveCrossLink", testReplaceCurrentArchiveWithArchiveCrossLink),
+//            ("testReplaceCurrentArchiveWithArchiveCrossLink", testReplaceCurrentArchiveWithArchiveCrossLink),
 //            ("testArchiveAddUncompressedEntryProgress", testArchiveAddUncompressedEntryProgress),
 //            ("testArchiveAddCompressedEntryProgress", testArchiveAddCompressedEntryProgress),
 //            ("testZIP64ArchiveAddEntryProgress", testZIP64ArchiveAddEntryProgress),

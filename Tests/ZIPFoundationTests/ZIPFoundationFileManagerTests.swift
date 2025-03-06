@@ -167,7 +167,7 @@ extension ZIPFoundationTests {
     // On Darwin platforms, we want the same behavior as the system-provided ZIP utilities.
     // On the Mac, this includes the graphical Archive Utility as well as the `ditto`
     // command line tool.
-    func testConsistentBehaviorWithSystemZIPUtilities() {
+    func testConsistentBehaviorWithSystemZIPUtilities() async {
 #if os(macOS)
         // We use a macOS framework bundle here because it covers a lot of file system edge cases like
         // double-symlinked directories etc.
@@ -176,7 +176,7 @@ extension ZIPFoundationTests {
         let builtInZIPURL = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent(UUID().uuidString)
             .appendingPathExtension("zip")
-        try? fileManager.zipItem(at: testBundleURL, to: builtInZIPURL)
+        try? await fileManager.zipItem(at: testBundleURL, to: builtInZIPURL)
 
         func shellZIP(directoryAtURL url: URL) -> URL {
             let zipTask = Process()
@@ -194,9 +194,9 @@ extension ZIPFoundationTests {
         }
 
         let shellZIPURL = shellZIP(directoryAtURL: testBundleURL)
-        let shellZIPInfos = ZIPInfo.makeZIPInfos(forArchiveAtURL: shellZIPURL, mode: .shellParsing)
+        let shellZIPInfos = await ZIPInfo.makeZIPInfos(forArchiveAtURL: shellZIPURL, mode: .shellParsing)
             .sorted { $0.path < $1.path }
-        let builtInZIPInfos = ZIPInfo.makeZIPInfos(forArchiveAtURL: builtInZIPURL, mode: .directoryIteration)
+        let builtInZIPInfos = await ZIPInfo.makeZIPInfos(forArchiveAtURL: builtInZIPURL, mode: .directoryIteration)
             .sorted { $0.path < $1.path }
         XCTAssert(shellZIPInfos == builtInZIPInfos)
 #endif
@@ -242,15 +242,15 @@ private struct ZIPInfo: Hashable {
         self.path = fields[7].trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    static func makeZIPInfos(forArchiveAtURL url: URL, mode: Mode) -> [ZIPInfo] {
+    static func makeZIPInfos(forArchiveAtURL url: URL, mode: Mode) async -> [ZIPInfo] {
 
-        func directoryZIPInfos(forArchiveAtURL url: URL) -> [ZIPInfo] {
+        func directoryZIPInfos(forArchiveAtURL url: URL) async -> [ZIPInfo] {
             let fileManager = FileManager()
             let tempDirectoryURL = URL(fileURLWithPath: NSTemporaryDirectory())
                 .standardizedFileURL
                 .appendingPathComponent(UUID().uuidString)
             let keys: [URLResourceKey] = [.fileSizeKey, .creationDateKey, .isDirectoryKey, .pathKey]
-            try? fileManager.unzipItem(at: url, to: tempDirectoryURL)
+            try? await fileManager.unzipItem(at: url, to: tempDirectoryURL)
             guard let enumerator = fileManager.enumerator(at: tempDirectoryURL, includingPropertiesForKeys: keys)
             else { return [] }
 
@@ -288,7 +288,7 @@ private struct ZIPInfo: Hashable {
 
         switch mode {
         case .directoryIteration:
-            return directoryZIPInfos(forArchiveAtURL: url)
+            return await directoryZIPInfos(forArchiveAtURL: url)
         case .shellParsing:
             return shellZIPInfos(forArchiveAtURL: url)
         }
