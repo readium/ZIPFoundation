@@ -16,7 +16,11 @@ public typealias FILEPointer = OpaquePointer
 public typealias FILEPointer = UnsafeMutablePointer<FILE>
 #endif
 
+#if swift(>=6)
 extension FILEPointer: @unchecked @retroactive Sendable {}
+#else
+extension FILEPointer: @unchecked Sendable {}
+#endif
 
 protocol DataSerializable {
     static var size: Int { get }
