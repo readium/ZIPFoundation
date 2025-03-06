@@ -70,7 +70,7 @@ extension Data {
         return try await self.process(operation: COMPRESSION_STREAM_ENCODE, size: size, bufferSize: bufferSize,
                                 provider: provider, consumer: consumer)
         #else
-        return try self.encode(size: size, bufferSize: bufferSize, provider: provider, consumer: consumer)
+        return try await self.encode(size: size, bufferSize: bufferSize, provider: provider, consumer: consumer)
         #endif
     }
 
@@ -166,7 +166,7 @@ private extension compression_stream {
 import CZlib
 
 extension Data {
-    static func encode(size: Int64, bufferSize: Int, provider: Provider, consumer: Consumer) throws -> CRC32 {
+    static func encode(size: Int64, bufferSize: Int, provider: Provider, consumer: Consumer) async throws -> CRC32 {
         var stream = z_stream()
         let streamSize = Int32(MemoryLayout<z_stream>.size)
         var result = deflateInit2_(&stream, Z_DEFAULT_COMPRESSION,
@@ -206,7 +206,7 @@ extension Data {
                     guard result >= Z_OK else { throw CompressionError.corruptedData }
 
                     outputChunk.count = bufferSize - Int(stream.avail_out)
-                    try consumer(outputChunk)
+                    try await consumer(outputChunk)
                 } while stream.avail_out == 0
             }
             position += Int64(readSize)
@@ -214,7 +214,7 @@ extension Data {
         return zipCRC32
     }
 
-    static func decode(bufferSize: Int, skipCRC32: Bool, provider: Provider, consumer: Consumer) throws -> CRC32 {
+    static func decode(bufferSize: Int, skipCRC32: Bool, provider: Provider, consumer: Consumer) async throws -> CRC32 {
         var stream = z_stream()
         let streamSize = Int32(MemoryLayout<z_stream>.size)
         var result = inflateInit2_(&stream, -MAX_WBITS, ZLIB_VERSION, streamSize)
@@ -224,7 +224,7 @@ extension Data {
         var position: Int64 = 0
         repeat {
             stream.avail_in = UInt32(bufferSize)
-            var chunk = try provider(position, bufferSize)
+            var chunk = try await provider(position, bufferSize)
             position += Int64(chunk.count)
             try chunk.withUnsafeMutableBytes { (rawBufferPointer) in
                 if let baseAddress = rawBufferPointer.baseAddress, rawBufferPointer.count > 0 {
