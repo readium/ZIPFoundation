@@ -88,7 +88,7 @@ extension Data {
         return try await self.process(operation: COMPRESSION_STREAM_DECODE, size: size, bufferSize: bufferSize,
                                 skipCRC32: skipCRC32, provider: provider, consumer: consumer)
         #else
-        return try self.decode(bufferSize: bufferSize, skipCRC32: skipCRC32, provider: provider, consumer: consumer)
+        return try await self.decode(bufferSize: bufferSize, skipCRC32: skipCRC32, provider: provider, consumer: consumer)
         #endif
     }
 }
@@ -178,7 +178,7 @@ extension Data {
         var zipCRC32 = CRC32(0)
         repeat {
             let readSize = Int(Swift.min((size - position), Int64(bufferSize)))
-            var inputChunk = try provider(position, readSize)
+            var inputChunk = try await provider(position, readSize)
             zipCRC32 = inputChunk.crc32(checksum: zipCRC32)
             stream.avail_in = UInt32(inputChunk.count)
             try inputChunk.withUnsafeMutableBytes { (rawBufferPointer) in
@@ -249,7 +249,7 @@ extension Data {
                         }
                         let remainingLength = UInt32(bufferSize) - stream.avail_out
                         outputData.count = Int(remainingLength)
-                        try consumer(outputData)
+                        try await consumer(outputData)
                         if !skipCRC32 { unzipCRC32 = outputData.crc32(checksum: unzipCRC32) }
                     } while stream.avail_out == 0
                 }
