@@ -14,7 +14,7 @@ let targets: [Target] = [
 let targets: [Target] = [
     .systemLibrary(name: "CZLib", pkgConfig: "zlib", providers: [.brew(["zlib"]), .apt(["zlib"])]),
     .target(name: "ReadiumZIPFoundation", dependencies: ["CZLib"], cSettings: [.define("_GNU_SOURCE", to: "1")]),
-    .testTarget(name: "ReadiumZIPFoundationTests", dependencies: ["ZIPFoundation"])
+    .testTarget(name: "ReadiumZIPFoundationTests", dependencies: ["ReadiumZIPFoundation"])
 ]
 #endif
 
