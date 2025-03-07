@@ -91,12 +91,12 @@ extension Archive {
         guard bufferSize > 0 else {
             throw ArchiveError.invalidBufferSize
         }
-        let localFileHeader = entry.localFileHeader
-        guard entry.dataOffset <= .max else { throw ArchiveError.invalidLocalHeaderDataOffset }
+        let localFileHeader = try await localFileHeader(for: entry)
+        let dataOffset = try entry.dataOffset(with: localFileHeader)
         
         let transaction = try await dataSource.openRead()
         var checksum = CRC32(0)
-        try await transaction.seek(to: entry.dataOffset)
+        try await transaction.seek(to: dataOffset)
         progress?.totalUnitCount = self.totalUnitCountForReading(entry)
         switch entry.type {
         case .file:
@@ -128,7 +128,6 @@ extension Archive {
             try await consumer(Data())
             progress?.completedUnitCount = self.totalUnitCountForReading(entry)
         case .symlink:
-            let localFileHeader = entry.localFileHeader
             let size = Int(localFileHeader.compressedSize)
             let data = try await transaction.read(length: size)
             checksum = data.crc32(checksum: 0)
@@ -162,10 +161,7 @@ extension Archive {
         guard range.lowerBound >= 0, range.upperBound <= entry.uncompressedSize else {
             throw ArchiveError.rangeOutOfBounds
         }
-        let localFileHeader = entry.localFileHeader
-        guard entry.dataOffset <= .max else {
-            throw ArchiveError.invalidLocalHeaderDataOffset
-        }
+        let localFileHeader = try await localFileHeader(for: entry)
         
         guard let compressionMethod = CompressionMethod(rawValue: localFileHeader.compressionMethod) else {
             throw ArchiveError.invalidCompressionMethod
@@ -173,10 +169,10 @@ extension Archive {
         
         switch compressionMethod {
         case .none:
-            try await extractStoredRange(range, of: entry, bufferSize: bufferSize, consumer: consumer)
+            try await extractStoredRange(range, of: entry, localFileHeader: localFileHeader, bufferSize: bufferSize, consumer: consumer)
             
         case .deflate:
-            try await extractCompressedRange(range, of: entry, bufferSize: bufferSize, consumer: consumer)
+            try await extractCompressedRange(range, of: entry, localFileHeader: localFileHeader, bufferSize: bufferSize, consumer: consumer)
         }
     }
     
@@ -185,11 +181,13 @@ extension Archive {
     private func extractStoredRange(
         _ range: Range<UInt64>,
         of entry: Entry,
+        localFileHeader: LocalFileHeader,
         bufferSize: Int,
         consumer: Consumer
     ) async throws {
+        let offset = try entry.dataOffset(with: localFileHeader)
         let transaction = try await dataSource.openRead()
-        try await transaction.seek(to: entry.dataOffset + range.lowerBound)
+        try await transaction.seek(to: offset + range.lowerBound)
         
         _ = try await Data.consumePart(
             of: Int64(range.count),
@@ -207,14 +205,16 @@ extension Archive {
     private func extractCompressedRange(
         _ range: Range<UInt64>,
         of entry: Entry,
+        localFileHeader: LocalFileHeader,
         bufferSize: Int,
         consumer: Consumer
     ) async throws {
+        let offset = try entry.dataOffset(with: localFileHeader)
         let transaction = try await dataSource.openRead()
         let bytesReadCounter = SharedMutableValue<UInt64>()
         
         do {
-            try await transaction.seek(to: entry.dataOffset)
+            try await transaction.seek(to: offset)
             
             _ = try await readCompressed(
                 transaction: transaction,

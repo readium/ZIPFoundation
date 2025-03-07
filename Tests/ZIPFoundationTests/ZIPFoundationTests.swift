@@ -336,9 +336,13 @@ extension ZIPFoundationTests {
 extension Archive {
     func checkIntegrity() async {
         do {
-            for try await entry in self {
+            for entry in try await entries() {
                 let checksum = try await self.extract(entry, consumer: { _ in })
-                guard checksum == entry.checksum else {
+                // The test files don't always have the CRC in the Central
+                // Directory, which is required by the spec. So we check also
+                // the local file headers.
+                let lfh = try await localFileHeader(for: entry)
+                guard checksum == entry.checksum || checksum == lfh.checksum else {
                     XCTFail("Integrity check failed")
                     return
                 }

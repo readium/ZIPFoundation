@@ -16,12 +16,12 @@ extension Archive {
     ///
     /// - Parameter entry: The entry that will be removed.
     /// - Returns: The number of the work units.
-    public func totalUnitCountForRemoving(_ entry: Entry) -> Int64 {
-        return Int64(self.offsetToStartOfCentralDirectory - entry.localSize)
+    func totalUnitCountForRemoving(_ entry: Entry, localFileHeader: LocalFileHeader) throws -> Int64 {
+        return try Int64(self.offsetToStartOfCentralDirectory - entry.localSize(with: localFileHeader))
     }
 
-    func makeProgressForRemoving(_ entry: Entry) -> Progress {
-        return Progress(totalUnitCount: self.totalUnitCountForRemoving(entry))
+    func makeProgressForRemoving(_ entry: Entry, localFileHeader: LocalFileHeader) throws -> Progress {
+        return Progress(totalUnitCount: try totalUnitCountForRemoving(entry, localFileHeader: localFileHeader))
     }
 
     /// The number of the work units that have to be performed when

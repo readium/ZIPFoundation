@@ -58,7 +58,7 @@ extension ZIPFoundationTests {
         XCTAssert(result == true)
         let invalidCentralDirArchive = try await Archive(url: invalidCentralDirArchiveURL,
                                                    accessMode: .read)
-        for try await _ in invalidCentralDirArchive {
+        for _ in try await invalidCentralDirArchive.entries() {
             didFailToMakeIteratorAsExpected = false
         }
         XCTAssertTrue(didFailToMakeIteratorAsExpected)
@@ -74,8 +74,11 @@ extension ZIPFoundationTests {
             try invalidLocalFHArchiveData.write(to: invalidLocalFHArchiveURL)
             let invalidLocalFHArchive = try await Archive(url: invalidLocalFHArchiveURL,
                                                     accessMode: .read)
-            for try await _ in invalidLocalFHArchive {
-                didFailToMakeIteratorAsExpected = false
+            for entry in try await invalidLocalFHArchive.entries() {
+                do {
+                    _ = try await invalidLocalFHArchive.localFileHeader(for: entry)
+                    didFailToMakeIteratorAsExpected = false
+                } catch {}
             }
         } catch {
             XCTFail("Unexpected error while testing iterator error conditions.")

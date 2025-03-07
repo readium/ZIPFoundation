@@ -97,6 +97,8 @@ extension Archive {
                               compressionMethod: compressionMethod, bufferSize: bufferSize,
                               progress: progress, provider: provider)
         }
+        
+        didWrite()
     }
 
     /// Write files, directories or symlinks to the receiver.
@@ -191,6 +193,8 @@ extension Archive {
             try await rollback(transaction, UInt64(fileHeaderStart), (existingData, existingSize), bufferSize, eocdRecord, zip64EOCD)
             throw ArchiveError.cancelledOperation
         }
+        
+        didWrite()
     }
 
     /// Remove a ZIP `Entry` from the receiver.
@@ -208,14 +212,16 @@ extension Archive {
             throw ArchiveError.unwritableArchive
         }
         
+        let lfh = try await localFileHeader(for: entry)
         let transaction = try await dataSource.openWrite()
         let (tempArchive, tempDir) = try await self.makeTempArchive()
         let tempTransaction = try await tempArchive.dataSource.openWrite()
         defer { tempDir.map { try? FileManager().removeItem(at: $0) } }
-        progress?.totalUnitCount = self.totalUnitCountForRemoving(entry)
+        progress?.totalUnitCount = try self.totalUnitCountForRemoving(entry, localFileHeader: lfh)
         var centralDirectoryData = Data()
         var offset: UInt64 = 0
-        for try await currentEntry in self {
+        for currentEntry in try await entries() {
+            let currentEntryLFH = try await localFileHeader(for: currentEntry)
             let cds = currentEntry.centralDirectoryStructure
             if currentEntry != entry {
                 let entryStart = cds.effectiveRelativeOffsetOfLocalHeader
@@ -228,13 +234,15 @@ extension Archive {
                     try await tempTransaction.write(data)
                     progress?.completedUnitCount += Int64(data.count)
                 }
-                guard currentEntry.localSize <= .max else { throw ArchiveError.invalidLocalHeaderSize }
-                _ = try await Data.consumePart(of: Int64(currentEntry.localSize), chunkSize: bufferSize,
+                let localSize = try currentEntry.localSize(with: currentEntryLFH)
+                _ = try await Data.consumePart(of: Int64(localSize), chunkSize: bufferSize,
                                                provider: provider, consumer: consumer)
                 let updatedCentralDirectory = updateOffsetInCentralDirectory(centralDirectoryStructure: cds,
                                                                              updatedOffset: entryStart - offset)
                 centralDirectoryData.append(updatedCentralDirectory.data)
-            } else { offset = currentEntry.localSize }
+            } else {
+                offset = try currentEntry.localSize(with: currentEntryLFH)
+            }
         }
         
         let startOfCentralDirectory = try await tempTransaction.position()
@@ -252,6 +260,8 @@ extension Archive {
         self.setEndOfCentralDirectory(ecodStructure)
         try await tempTransaction.flush()
         try await self.replaceCurrentArchive(with: tempArchive)
+        
+        didWrite()
     }
 
     func replaceCurrentArchive(with archive: Archive) async throws {
@@ -270,6 +280,8 @@ extension Archive {
         _ = try fileManager.moveItem(at: archiveURL, to: url)
 #endif
         self.dataSource = try await FileDataSource(url: url, isWritable: true)
+        
+        didWrite()
     }
 }
 

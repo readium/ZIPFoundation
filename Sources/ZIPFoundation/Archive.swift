@@ -52,9 +52,7 @@ let centralDirectoryStructSignature = 0x02014b50
 ///     var archiveURL = URL(fileURLWithPath: "/path/file.zip")
 ///     var archive = Archive(url: archiveURL, accessMode: .update)
 ///     try archive?.addEntry("test.txt", relativeTo: baseURL, compressionMethod: .deflate)
-public actor Archive: AsyncSequence {
-    public typealias Element = Entry
-    
+public actor Archive {
 
     typealias LocalFileHeader = Entry.LocalFileHeader
     typealias DataDescriptor = Entry.DefaultDataDescriptor
@@ -79,6 +77,8 @@ public actor Archive: AsyncSequence {
         case invalidBufferSize
         /// Thrown when uncompressedSize/compressedSize exceeds `Int64.max` (Imposed by file API).
         case invalidEntrySize
+        /// Thrown when the local header cannot be found.
+        case localHeaderNotFound
         /// Thrown when the offset of local header data exceeds `Int64.max` (Imposed by file API).
         case invalidLocalHeaderDataOffset
         /// Thrown when the size of local header exceeds `Int64.max` (Imposed by file API).
@@ -206,80 +206,42 @@ public actor Archive: AsyncSequence {
         self.zip64EndOfCentralDirectory = config.zip64EndOfCentralDirectory
     }
 
-    public nonisolated func makeAsyncIterator() -> Iterator {
-        Iterator(archive: self)
+    private var entriesTask: Task<[Entry], Error>?
+    
+    /// Returns the list of entries in the archive.
+    public func entries() async throws -> [Entry] {
+        if entriesTask == nil {
+            entriesTask = Task { try await readEntries() }
+        }
+        
+        return try await entriesTask!.value
     }
     
-    public actor Iterator: AsyncIteratorProtocol {
-        
-        private struct Input {
-            let transaction: DataSourceTransaction
-            let totalNumberOfEntriesInCD: UInt64
+    private func readEntries() async throws -> [Entry] {
+        guard totalNumberOfEntriesInCentralDirectory > 0 else {
+            return []
         }
         
-        private let archive: Archive
-        private var directoryIndex: UInt64 = 0
-        private var index = 0
+        var entries: [Entry] = []
+        var directoryIndex = offsetToStartOfCentralDirectory
+        let transaction = try await dataSource.openRead()
         
-        fileprivate init(archive: Archive) {
-            self.archive = archive
-        }
-        
-        private var _initializeTask: Task<DataSourceTransaction, Error>?
-        
-        private func initialize() async throws -> DataSourceTransaction {
-            if _initializeTask == nil {
-                _initializeTask = Task {
-                    directoryIndex = await archive.offsetToStartOfCentralDirectory
-                    return try await archive.dataSource.openRead()
-                }
+        for _ in 0..<totalNumberOfEntriesInCentralDirectory {
+            guard let centralDirStruct: CentralDirectoryStructure = try await transaction.readStruct(at: directoryIndex) else {
+                continue
             }
             
-            return try await _initializeTask!.value
+            if let entry = Entry(centralDirectoryStructure: centralDirStruct) {
+                entries.append(entry)
+            }
+            
+            directoryIndex += UInt64(CentralDirectoryStructure.size)
+            directoryIndex += UInt64(centralDirStruct.fileNameLength)
+            directoryIndex += UInt64(centralDirStruct.extraFieldLength)
+            directoryIndex += UInt64(centralDirStruct.fileCommentLength)
         }
         
-        public func next() async throws -> Entry? {
-            let totalNumberOfEntries = await archive.totalNumberOfEntriesInCentralDirectory
-            guard index < totalNumberOfEntries else {
-                return nil
-            }
-
-            let dataSource = try await initialize()
-
-            do {
-                guard let centralDirStruct: CentralDirectoryStructure = try await dataSource.readStruct(at: directoryIndex) else {
-                    return nil
-                }
-                let offset = UInt64(centralDirStruct.effectiveRelativeOffsetOfLocalHeader)
-                guard let localFileHeader: LocalFileHeader = try await dataSource.readStruct(at: offset) else { return nil }
-                var dataDescriptor: DataDescriptor?
-                var zip64DataDescriptor: ZIP64DataDescriptor?
-                if centralDirStruct.usesDataDescriptor {
-                    let additionalSize = UInt64(localFileHeader.fileNameLength) + UInt64(localFileHeader.extraFieldLength)
-                    let isCompressed = centralDirStruct.compressionMethod != CompressionMethod.none.rawValue
-                    let dataSize = isCompressed
-                    ? centralDirStruct.effectiveCompressedSize
-                    : centralDirStruct.effectiveUncompressedSize
-                    let descriptorPosition = offset + UInt64(LocalFileHeader.size) + additionalSize + dataSize
-                    if centralDirStruct.isZIP64 {
-                        zip64DataDescriptor = try await dataSource.readStruct(at: descriptorPosition)
-                    } else {
-                        dataDescriptor = try await dataSource.readStruct(at: descriptorPosition)
-                    }
-                }
-                defer {
-                    directoryIndex += UInt64(CentralDirectoryStructure.size)
-                    directoryIndex += UInt64(centralDirStruct.fileNameLength)
-                    directoryIndex += UInt64(centralDirStruct.extraFieldLength)
-                    directoryIndex += UInt64(centralDirStruct.fileCommentLength)
-                    index += 1
-                }
-                return Entry(centralDirectoryStructure: centralDirStruct, localFileHeader: localFileHeader,
-                             dataDescriptor: dataDescriptor, zip64DataDescriptor: zip64DataDescriptor)
-            } catch {
-                return nil
-            }
-        }
+        return entries
     }
 
     /// Retrieve the ZIP `Entry` with the given `path` from the receiver.
@@ -291,10 +253,64 @@ public actor Archive: AsyncSequence {
     /// - Parameter path: A relative file path identifying the corresponding `Entry`.
     /// - Returns: An `Entry` with the given `path`. Otherwise, `nil`.
     public func get(_ path: String) async throws -> Entry? {
-        if let encoding = self.pathEncoding {
-            return try await self.first { $0.path(using: encoding) == path }
+        let result = try await entries().first {
+            if let encoding = self.pathEncoding {
+                return $0.path(using: encoding) == path
+            } else {
+                return $0.path == path
+            }
         }
-        return try await self.first { $0.path == path }
+        return result
+    }
+    
+    /// Cache for local file headers.
+    private var localFileHeaders: [String: Task<LocalFileHeader, Error>] = [:]
+    
+    /// Retrieves the local file header for the given `entry`.
+    func localFileHeader(for entry: Entry) async throws -> LocalFileHeader {
+        if let task = localFileHeaders[entry.path] {
+            return try await task.value
+        }
+        
+        let task = Task {
+            let transaction = try await dataSource.openRead()
+            let centralDirStruct = entry.centralDirectoryStructure
+            let offset = UInt64(centralDirStruct.effectiveRelativeOffsetOfLocalHeader)
+            guard
+                var localFileHeader: LocalFileHeader = try await transaction.readStruct(at: offset)
+            else {
+                throw Archive.ArchiveError.localHeaderNotFound
+            }
+            
+            /// We only load the data descriptors if we are in writing mode, because
+            /// they might need to be written over. In read mode it is is
+            /// superfluous as the same infos are in the central directory structure.
+            if centralDirStruct.usesDataDescriptor && accessMode != .read {
+                let additionalSize = UInt64(localFileHeader.fileNameLength) + UInt64(localFileHeader.extraFieldLength)
+                let isCompressed = centralDirStruct.compressionMethod != CompressionMethod.none.rawValue
+                let dataSize = isCompressed
+                ? centralDirStruct.effectiveCompressedSize
+                : centralDirStruct.effectiveUncompressedSize
+                let descriptorPosition = offset + UInt64(LocalFileHeader.size) + additionalSize + dataSize
+                if centralDirStruct.isZIP64 {
+                    localFileHeader.zip64DataDescriptor = try await transaction.readStruct(at: descriptorPosition)
+                } else {
+                    localFileHeader.dataDescriptor = try await transaction.readStruct(at: descriptorPosition)
+                }
+            }
+            
+            return localFileHeader
+        }
+        localFileHeaders[entry.path] = task
+        
+        return try await task.value
+    }
+    
+    /// Called when the archive was modified.
+    func didWrite() {
+        // Clears the caches.
+        entriesTask = nil
+        localFileHeaders = [:]
     }
 
     // MARK: - Helpers

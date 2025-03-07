@@ -15,7 +15,7 @@ extension ZIPFoundationTests {
 
     func testExtractUncompressedFolderEntries() async throws {
         let archive = await self.archive(for: #function, mode: .read)
-        for try await entry in archive {
+        for entry in try await archive.entries() {
             do {
                 // Test extracting to memory
                 var checksum = try await archive.extract(entry, bufferSize: 32, consumer: { _ in })
@@ -40,7 +40,7 @@ extension ZIPFoundationTests {
 
     func testExtractCompressedFolderEntries() async throws {
         let archive = await self.archive(for: #function, mode: .read)
-        for try await entry in archive {
+        for entry in try await archive.entries() {
             do {
                 // Test extracting to memory
                 var checksum = try await archive.extract(entry, bufferSize: 128, consumer: { _ in })
@@ -65,7 +65,7 @@ extension ZIPFoundationTests {
 
     func testExtractUncompressedDataDescriptorArchive() async throws {
         let archive = await self.archive(for: #function, mode: .read)
-        for try await entry in archive {
+        for entry in try await archive.entries() {
             do {
                 let checksum = try await archive.extract(entry, consumer: { _ in })
                 XCTAssert(entry.checksum == checksum)
@@ -76,11 +76,12 @@ extension ZIPFoundationTests {
     }
 
     func testExtractCompressedDataDescriptorArchive() async throws {
-        let archive = await self.archive(for: #function, mode: .read)
-        for try await entry in archive {
+        let archive = await self.archive(for: #function, mode: .update)
+        for entry in try await archive.entries() {
             do {
                 let checksum = try await archive.extract(entry, consumer: { _ in })
-                XCTAssert(entry.checksum == checksum)
+                let lfh = try await archive.localFileHeader(for: entry)
+                XCTAssert(lfh.checksum == checksum)
             } catch {
                 XCTFail("Failed to unzip data descriptor archive")
             }
@@ -99,7 +100,7 @@ extension ZIPFoundationTests {
 
     func testExtractMSDOSArchive() async throws {
         let archive = await self.archive(for: #function, mode: .read)
-        for try await entry in archive {
+        for entry in try await archive.entries() {
             do {
                 let checksum = try await archive.extract(entry, consumer: { _ in })
                 XCTAssert(entry.checksum == checksum)
@@ -156,7 +157,7 @@ extension ZIPFoundationTests {
 
     func testCorruptSymbolicLinkErrorConditions() async throws {
         let archive = await self.archive(for: #function, mode: .read)
-        for try await entry in archive {
+        for entry in try await archive.entries() {
             var tempFileURL = URL(fileURLWithPath: NSTemporaryDirectory())
             tempFileURL.appendPathComponent(ProcessInfo.processInfo.globallyUniqueString)
             await XCTAssertSwiftError(try await archive.extract(entry, to: tempFileURL),
@@ -178,7 +179,7 @@ extension ZIPFoundationTests {
     func testExtractEncryptedArchiveErrorConditions() async throws {
         let archive = await self.archive(for: #function, mode: .read)
         var entriesRead = 0
-        for try await _ in archive {
+        for entry in try await archive.entries() {
             entriesRead += 1
         }
         // We currently don't support encryption so we expect failed initialization for entry objects.
@@ -263,7 +264,7 @@ extension ZIPFoundationTests {
             "META-INF/": .directory,
             "META-INF/container.xml": .file
         ]
-        for try await entry in archive {
+        for entry in try await archive.entries() {
             XCTAssertEqual(entry.type, expectedData[entry.path])
         }
     }
