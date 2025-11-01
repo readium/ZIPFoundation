@@ -13,5 +13,5 @@ Pod::Spec.new do |s|
   s.osx.deployment_target = '11.0'
 
   s.source_files = 'Sources/ZIPFoundation/*.swift'
-  s.resource_bundles = {'ZIPFoundation_Privacy' => ['Sources/ZIPFoundation/Resources/PrivacyInfo.xcprivacy']}
+  s.resource_bundles = {'ReadiumZIPFoundation_Privacy' => ['Sources/ZIPFoundation/Resources/PrivacyInfo.xcprivacy']}
 end
