@@ -100,7 +100,7 @@ extension ZIPFoundationTests {
         }
     }
 
-    func testUnzipSymlink() {
+    func testUnzipSymlink() async {
         // stored by zip 3.0 via command line: zip -ry
         //
         // testUnzipSymlink.zip/
@@ -109,20 +109,20 @@ extension ZIPFoundationTests {
         //   ├─ directory2
         //     ├─ testUnzipSymlink.png
         do {
-            try unarchiveZIP64Item(for: #function)
+            try await unarchiveZIP64Item(for: #function)
         } catch {
             XCTFail("\(error)")
         }
     }
 
-    func testUnzipCompressedSymlink() {
+    func testUnzipCompressedSymlink() async {
         // testUnzipCompressedSymlink.zip/
         //   ├─ directory1
         //     ├─ testUnzipSymlink (compressed)
         //   ├─ directory2
         //     ├─ testUnzipSymlink.png
         do {
-            try unarchiveZIP64Item(for: #function)
+            try await unarchiveZIP64Item(for: #function)
         } catch {
             XCTFail("\(error)")
         }

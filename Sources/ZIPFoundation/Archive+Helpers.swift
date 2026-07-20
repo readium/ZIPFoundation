@@ -64,26 +64,7 @@ extension Archive {
         )
     }
 
-    func readSymbolicLink(entry: Entry, bufferSize: Int, skipCRC32: Bool,
-                          progress: Progress? = nil, with consumer: Consumer) throws -> CRC32 {
-        var checksum = CRC32(0)
-        let localFileHeader = entry.localFileHeader
-        guard let compressionMethod = CompressionMethod(rawValue: localFileHeader.compressionMethod) else {
-            throw ArchiveError.invalidCompressionMethod
-        }
-        switch compressionMethod {
-        case .none:
-            let localFileHeader = entry.localFileHeader
-            let size = Int(localFileHeader.compressedSize)
-            let data = try Data.readChunk(of: size, from: self.archiveFile)
-            checksum = data.crc32(checksum: 0)
-            try consumer(data)
-            progress?.completedUnitCount = self.totalUnitCountForReading(entry)
-        case .deflate: checksum = try self.readCompressed(entry: entry, bufferSize: bufferSize,
-                                                          skipCRC32: skipCRC32, progress: progress, with: consumer)
-        }
-        return checksum
-    }
+
 
     // MARK: - Writing
 

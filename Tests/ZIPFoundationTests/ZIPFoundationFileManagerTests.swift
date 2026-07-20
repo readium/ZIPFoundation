@@ -160,7 +160,7 @@ extension ZIPFoundationTests {
                                   provider: { (_, _) -> Data in
             return Data(linkTarget.utf8)
         })
-        try? await fileManager.unzipItem(at: linkArchiveURL, to: destinationURL, allowUncontainedSymlinks: true)
+        try? await fileManager.unzipItem(at: linkArchiveURL, to: destinationURL, symlinksValidWithin: .rootFS)
         XCTAssert(fileManager.itemExists(at: destinationURL.appendingPathComponent("link")))
     }
 
@@ -255,7 +255,7 @@ private struct ZIPInfo: Hashable {
             else { return [] }
 
             var zipInfos = [ZIPInfo]()
-            for case let fileURL as URL in enumerator {
+            while let fileURL = enumerator.nextObject() as? URL {
                 guard let resourceValues = try? fileURL.resourceValues(forKeys: Set(keys)),
                       let path = resourceValues.path,
                       let isDirectory = resourceValues.isDirectory else { continue }

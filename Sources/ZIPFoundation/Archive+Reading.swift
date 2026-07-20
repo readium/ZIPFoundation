@@ -133,11 +133,26 @@ extension Archive {
             try await consumer(Data())
             progress?.completedUnitCount = self.totalUnitCountForReading(entry)
         case .symlink:
-            let size = Int(localFileHeader.compressedSize)
-            let data = try await transaction.read(length: size)
-            checksum = data.crc32(checksum: 0)
-            try await consumer(data)
-            progress?.completedUnitCount = self.totalUnitCountForReading(entry)
+            guard let compressionMethod = CompressionMethod(rawValue: localFileHeader.compressionMethod) else {
+                throw ArchiveError.invalidCompressionMethod
+            }
+            switch compressionMethod {
+            case .none:
+                let size = Int(localFileHeader.compressedSize)
+                let data = try await transaction.read(length: size)
+                checksum = data.crc32(checksum: 0)
+                try await consumer(data)
+                progress?.completedUnitCount = self.totalUnitCountForReading(entry)
+            case .deflate:
+                checksum = try await self.readCompressed(
+                    transaction: transaction,
+                    entry: entry,
+                    bufferSize: bufferSize,
+                    skipCRC32: skipCRC32,
+                    progress: progress,
+                    with: consumer
+                )
+            }
         }
         return checksum
     }

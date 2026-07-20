@@ -179,7 +179,7 @@ extension ZIPFoundationTests {
     func testExtractEncryptedArchiveErrorConditions() async throws {
         let archive = await self.archive(for: #function, mode: .read)
         var entriesRead = 0
-        for entry in try await archive.entries() {
+        for _ in try await archive.entries() {
             entriesRead += 1
         }
         // We currently don't support encryption so we expect failed initialization for entry objects.
@@ -293,14 +293,14 @@ extension ZIPFoundationTests {
                             throwsErrorWithCode: .fileReadInvalidFileName)
     }
 
-    func testInvalidSymlinkCompressionMethodErrorConditions() {
-        let archive = self.archive(for: #function, mode: .read)
-        guard let entry = archive["symlink"] else {
+    func testInvalidSymlinkCompressionMethodErrorConditions() async {
+        let archive = await self.archive(for: #function, mode: .read)
+        guard let entry = try? await archive.get("symlink") else {
             XCTFail("Missing entry in test archive")
             return
         }
 
-        XCTAssertSwiftError(try archive.extract(entry, consumer: { (_) in }),
+        await XCTAssertSwiftError(try await archive.extract(entry, consumer: { (_) in }),
                             throws: Archive.ArchiveError.invalidCompressionMethod)
     }
 }

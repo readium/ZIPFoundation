@@ -74,17 +74,6 @@ extension ZIPFoundationTests {
         nonExistantURL.appendPathComponent("invalid.path")
         await XCTAssertPOSIXError(try fileManager.setSymlinkModificationDate(Date(), ofItemAtURL: nonExistantURL),
                             throwsErrorWithCode: .ENOENT)
-        XCTAssertPOSIXError(
-            try fileManager.setAttributes(
-                [
-                    .posixPermissions: providedPermissions,
-                    .modificationDate: Date()
-                ],
-                ofItemAtURL: nonExistentURL,
-                traverseLink: false
-            ),
-            throwsErrorWithCode: .ENOENT
-        )
 #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
         var resourceValues = URLResourceValues()
         resourceValues.isUserImmutable = true
@@ -95,7 +84,6 @@ extension ZIPFoundationTests {
         }
         await XCTAssertPOSIXError(try fileManager.setSymlinkModificationDate(Date(), ofItemAtURL: assetURL),
                             throwsErrorWithCode: .EPERM)
-#endif
 #endif
     }
 

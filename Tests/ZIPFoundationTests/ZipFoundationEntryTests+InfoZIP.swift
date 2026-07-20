@@ -9,7 +9,7 @@
 //
 
 import XCTest
-@testable import ZIPFoundation
+@testable import ReadiumZIPFoundation
 
 extension ZIPFoundationTests {
 
@@ -26,10 +26,10 @@ extension ZIPFoundationTests {
         XCTAssertNotNil(infoZIP)
     }
 
-    func testInfoZIPUnicodePath() {
+    func testInfoZIPUnicodePath() async throws {
         let fileManager = FileManager()
-        let archive = self.archive(for: #function, mode: .read)
+        let archive = await self.archive(for: #function, mode: .read)
         let destinationURL = self.createDirectory(for: #function)
-        XCTAssertNoThrow(try fileManager.unzipItem(at: archive.url, to: destinationURL))
+        try await fileManager.unzipItem(at: archive.url!, to: destinationURL)
     }
 }

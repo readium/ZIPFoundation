@@ -182,7 +182,7 @@ class ZIPFoundationTests: XCTestCase {
 
 extension ZIPFoundationTests {
     // From https://oleb.net/blog/2017/03/keeping-xctest-in-sync/
-    func testLinuxTestSuiteIncludesAllTests() {
+    func testLinuxTestSuiteIncludesAllTests() async throws {
         #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
             let thisClass = type(of: self)
             let linuxCount = thisClass.allTests.count
@@ -194,10 +194,12 @@ extension ZIPFoundationTests {
 
     static var allTests: [(String, (ZIPFoundationTests) -> () async throws -> Void)] {
         return [
+            ("testLinuxTestSuiteIncludesAllTests", testLinuxTestSuiteIncludesAllTests),
             ("testArchiveAddEntryErrorConditions", testArchiveAddEntryErrorConditions),
             ("testArchiveCreateErrorConditions", testArchiveCreateErrorConditions),
             ("testArchiveInvalidEOCDRecordConditions", testArchiveInvalidEOCDRecordConditions),
             ("testArchiveInvalidDataErrorConditions", testArchiveInvalidDataErrorConditions),
+            ("testInvalidSymlinkCompressionMethodErrorConditions", testInvalidSymlinkCompressionMethodErrorConditions),
             ("testArchiveIteratorErrorConditions", testArchiveIteratorErrorConditions),
             ("testArchiveReadErrorConditions", testArchiveReadErrorConditions),
             ("testArchiveUpdateErrorConditions", testArchiveUpdateErrorConditions),
@@ -334,7 +336,7 @@ extension ZIPFoundationTests {
         #endif
     }
 
-    static var posixOnlyTests: [(String, (ZIPFoundationTests) -> () throws -> Void)] {
+    static var posixOnlyTests: [(String, (ZIPFoundationTests) -> () async throws -> Void)] {
         #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS) || os(Linux)
         return [
             ("testSymlinkModificationDateTransferErrorConditions", testSymlinkModificationDateTransferErrorConditions)
