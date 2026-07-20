@@ -12,8 +12,16 @@ let targets: [Target] = [
 ]
 #else
 let targets: [Target] = [
-    .systemLibrary(name: "CZLib", pkgConfig: "zlib", providers: [.brew(["zlib"]), .apt(["zlib"])]),
-    .target(name: "ReadiumZIPFoundation", dependencies: ["CZLib"], path: "Sources/ZIPFoundation", cSettings: [.define("_GNU_SOURCE", to: "1")]),
+    .systemLibrary(
+        name: "CZLib",
+        pkgConfig: "zlib",
+        providers: [.brew(["zlib"]), .apt(["zlib"])]),
+    .target(
+        name: "ReadiumZIPFoundation",
+        dependencies: ["CZLib"],
+        path: "Sources/ZIPFoundation",
+        cSettings: [.define("_GNU_SOURCE", to: "1")],
+        linkerSettings: [.linkedLibrary("z")]),
     .testTarget(name: "ReadiumZIPFoundationTests", dependencies: ["ReadiumZIPFoundation"])
 ]
 #endif

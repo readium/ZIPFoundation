@@ -2,7 +2,7 @@
 //  ZIPFoundationReadingTests.swift
 //  ZIPFoundation
 //
-//  Copyright © 2017-2024 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
+//  Copyright © 2017-2026 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
 //  Released under the MIT License.
 //
 //  See https://github.com/weichsel/ZIPFoundation/blob/master/LICENSE for license information.
@@ -291,5 +291,16 @@ extension ZIPFoundationTests {
         let destinationURL = self.createDirectory(for: #function)
         await XCTAssertCocoaError(try await fileManager.unzipItem(at: archive.url!, to: destinationURL),
                             throwsErrorWithCode: .fileReadInvalidFileName)
+    }
+
+    func testInvalidSymlinkCompressionMethodErrorConditions() {
+        let archive = self.archive(for: #function, mode: .read)
+        guard let entry = archive["symlink"] else {
+            XCTFail("Missing entry in test archive")
+            return
+        }
+
+        XCTAssertSwiftError(try archive.extract(entry, consumer: { (_) in }),
+                            throws: Archive.ArchiveError.invalidCompressionMethod)
     }
 }

@@ -2,7 +2,7 @@
 //  Archive+Helpers.swift
 //  ZIPFoundation
 //
-//  Copyright © 2017-2024 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
+//  Copyright © 2017-2026 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
 //  Released under the MIT License.
 //
 //  See https://github.com/weichsel/ZIPFoundation/blob/master/LICENSE for license information.
@@ -64,6 +64,27 @@ extension Archive {
         )
     }
 
+    func readSymbolicLink(entry: Entry, bufferSize: Int, skipCRC32: Bool,
+                          progress: Progress? = nil, with consumer: Consumer) throws -> CRC32 {
+        var checksum = CRC32(0)
+        let localFileHeader = entry.localFileHeader
+        guard let compressionMethod = CompressionMethod(rawValue: localFileHeader.compressionMethod) else {
+            throw ArchiveError.invalidCompressionMethod
+        }
+        switch compressionMethod {
+        case .none:
+            let localFileHeader = entry.localFileHeader
+            let size = Int(localFileHeader.compressedSize)
+            let data = try Data.readChunk(of: size, from: self.archiveFile)
+            checksum = data.crc32(checksum: 0)
+            try consumer(data)
+            progress?.completedUnitCount = self.totalUnitCountForReading(entry)
+        case .deflate: checksum = try self.readCompressed(entry: entry, bufferSize: bufferSize,
+                                                          skipCRC32: skipCRC32, progress: progress, with: consumer)
+        }
+        return checksum
+    }
+
     // MARK: - Writing
 
     func writeEntry(
@@ -119,8 +140,7 @@ extension Archive {
         modificationDateTime: (UInt16, UInt16)
     ) async throws -> LocalFileHeader {
         // We always set Bit 11 in generalPurposeBitFlag, which indicates an UTF-8 encoded path.
-        guard let fileNameData = path.data(using: .utf8) else { throw ArchiveError.invalidEntryPath }
-
+        let fileNameData = Data(path.utf8)
         var uncompressedSizeOfLFH = UInt32(0)
         var compressedSizeOfLFH = UInt32(0)
         var extraFieldLength = UInt16(0)

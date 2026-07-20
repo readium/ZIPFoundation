@@ -2,7 +2,7 @@
 //  Archive+ZIP64.swift
 //  ZIPFoundation
 //
-//  Copyright © 2017-2024 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
+//  Copyright © 2017-2026 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
 //  Released under the MIT License.
 //
 //  See https://github.com/weichsel/ZIPFoundation/blob/master/LICENSE for license information.
@@ -12,10 +12,6 @@ import Foundation
 
 let zip64EOCDRecordStructSignature = 0x06064b50
 let zip64EOCDLocatorStructSignature = 0x07064b50
-
-enum ExtraFieldHeaderID: UInt16 {
-    case zip64ExtendedInformation = 0x0001
-}
 
 extension Archive {
     struct ZIP64EndOfCentralDirectory {

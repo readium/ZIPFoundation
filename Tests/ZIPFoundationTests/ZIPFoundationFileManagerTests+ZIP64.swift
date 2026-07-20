@@ -2,7 +2,7 @@
 //  ZIPFoundationFileManagerTests+ZIP64.swift
 //  ZIPFoundation
 //
-//  Copyright © 2017-2024 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
+//  Copyright © 2017-2026 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
 //  Released under the MIT License.
 //
 //  See https://github.com/weichsel/ZIPFoundation/blob/master/LICENSE for license information.
@@ -95,6 +95,34 @@ extension ZIPFoundationTests {
         //   ├─ simple.data
         do {
             try await unarchiveZIP64Item(for: #function)
+        } catch {
+            XCTFail("\(error)")
+        }
+    }
+
+    func testUnzipSymlink() {
+        // stored by zip 3.0 via command line: zip -ry
+        //
+        // testUnzipSymlink.zip/
+        //   ├─ directory1
+        //     ├─ testUnzipSymlink
+        //   ├─ directory2
+        //     ├─ testUnzipSymlink.png
+        do {
+            try unarchiveZIP64Item(for: #function)
+        } catch {
+            XCTFail("\(error)")
+        }
+    }
+
+    func testUnzipCompressedSymlink() {
+        // testUnzipCompressedSymlink.zip/
+        //   ├─ directory1
+        //     ├─ testUnzipSymlink (compressed)
+        //   ├─ directory2
+        //     ├─ testUnzipSymlink.png
+        do {
+            try unarchiveZIP64Item(for: #function)
         } catch {
             XCTFail("\(error)")
         }

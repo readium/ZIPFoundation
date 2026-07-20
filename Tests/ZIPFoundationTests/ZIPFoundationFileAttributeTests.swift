@@ -2,7 +2,7 @@
 //  ZIPFoundationFileAttributeTests.swift
 //  ZIPFoundation
 //
-//  Copyright © 2017-2024 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
+//  Copyright © 2017-2026 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
 //  Released under the MIT License.
 //
 //  See https://github.com/weichsel/ZIPFoundation/blob/master/LICENSE for license information.
@@ -22,9 +22,7 @@ extension ZIPFoundationTests {
                                  0xb0, 0x11, 0x00, 0x00, 0x00, 0x00]
         guard let cds = await Entry.CentralDirectoryStructure(data: Data(cdsBytes),
                                                         additionalDataProvider: { count -> Data in
-            guard let pathData = "/".data(using: .utf8) else {
-                throw AdditionalDataError.encodingError
-            }
+            let pathData = Data("/".utf8)
             XCTAssert(count == pathData.count)
             return pathData
         }) else {
@@ -76,6 +74,17 @@ extension ZIPFoundationTests {
         nonExistantURL.appendPathComponent("invalid.path")
         await XCTAssertPOSIXError(try fileManager.setSymlinkModificationDate(Date(), ofItemAtURL: nonExistantURL),
                             throwsErrorWithCode: .ENOENT)
+        XCTAssertPOSIXError(
+            try fileManager.setAttributes(
+                [
+                    .posixPermissions: providedPermissions,
+                    .modificationDate: Date()
+                ],
+                ofItemAtURL: nonExistentURL,
+                traverseLink: false
+            ),
+            throwsErrorWithCode: .ENOENT
+        )
 #if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
         var resourceValues = URLResourceValues()
         resourceValues.isUserImmutable = true
@@ -86,6 +95,7 @@ extension ZIPFoundationTests {
         }
         await XCTAssertPOSIXError(try fileManager.setSymlinkModificationDate(Date(), ofItemAtURL: assetURL),
                             throwsErrorWithCode: .EPERM)
+#endif
 #endif
     }
 

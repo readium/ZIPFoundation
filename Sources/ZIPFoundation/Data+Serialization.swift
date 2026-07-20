@@ -2,14 +2,20 @@
 //  Data+Serialization.swift
 //  ZIPFoundation
 //
-//  Copyright © 2017-2024 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
+//  Copyright © 2017-2026 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
 //  Released under the MIT License.
 //
 //  See https://github.com/weichsel/ZIPFoundation/blob/master/LICENSE for license information.
 //
 
 import Foundation
+#if canImport(Android)
+import Android
+#endif
 
+// The Swift Android SDK imports `FILE` as opaque; everywhere else
+// (including Windows MSVC, where it's `_iobuf`) it's a typed struct so
+// we can take a typed pointer.
 #if os(Android)
 public typealias FILEPointer = OpaquePointer
 #else
@@ -41,7 +47,7 @@ extension Data {
 
     static func readStruct<T>(from file: FILEPointer, at offset: UInt64) async -> T? where T: DataSerializable {
         guard offset <= .max else { return nil }
-        fseeko(file, off_t(offset), SEEK_SET)
+        fseeko(file, zip_off_t(offset), SEEK_SET)
         guard let data = try? self.readChunk(of: T.size, from: file) else {
             return nil
         }
@@ -85,6 +91,7 @@ extension Data {
         let bytesRead = fread(bytes, 1, size, file)
         let error = ferror(file)
         if error > 0 {
+            bytes.deallocate()
             throw DataError.unreadableFile
         }
         #if swift(>=4.1)

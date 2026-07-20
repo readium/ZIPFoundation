@@ -2,14 +2,19 @@
 //  Entry.swift
 //  ZIPFoundation
 //
-//  Copyright © 2017-2024 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
+//  Copyright © 2017-2026 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
 //  Released under the MIT License.
 //
 //  See https://github.com/weichsel/ZIPFoundation/blob/master/LICENSE for license information.
 //
 
 import Foundation
+#if canImport(CoreFoundation)
 import CoreFoundation
+#endif
+#if canImport(Android)
+import Android
+#endif
 
 /// A value that represents a file, a directory or a symbolic link within a ZIP `Archive`.
 ///
@@ -125,15 +130,19 @@ public struct Entry: Equatable, Sendable {
     /// - Parameters:
     ///   - encoding: `String.Encoding`
     public func path(using encoding: String.Encoding) -> String {
-        return String(data: self.centralDirectoryStructure.fileNameData, encoding: encoding) ?? ""
+        return String(pathData: self.centralDirectoryStructure.fileNameData, encoding: encoding)
     }
     /// The `path` of the receiver within a ZIP `Archive`.
     public var path: String {
-        let dosLatinUS = 0x400
-        let dosLatinUSEncoding = CFStringEncoding(dosLatinUS)
-        let dosLatinUSStringEncoding = CFStringConvertEncodingToNSStringEncoding(dosLatinUSEncoding)
-        let codepage437 = String.Encoding(rawValue: dosLatinUSStringEncoding)
-        let encoding = self.centralDirectoryStructure.usesUTF8PathEncoding ? .utf8 : codepage437
+        // Read Info-ZIP Unicode Path extra field if present
+        if let infoZIPExtraField = self.infoZIPExtraField {
+            // Validate CRC32 before using the Unicode name
+            let originalFilenameCRC32 = self.centralDirectoryStructure.fileNameData.crc32(checksum: 0)
+            if infoZIPExtraField.nameCRC32 == originalFilenameCRC32 {
+                return String(pathData: infoZIPExtraField.unicodeName, encoding: .utf8)
+            }
+        }
+        let encoding = self.centralDirectoryStructure.usesUTF8PathEncoding ? String.Encoding.utf8 : .codepage437
         return self.path(using: encoding)
     }
     /// The file attributes of the receiver as key/value pairs.
@@ -156,10 +165,15 @@ public struct Entry: Equatable, Sendable {
         var isDirectory = self.path.hasSuffix("/")
         switch osType {
         case .unix, .osx:
-            let mode = mode_t(self.centralDirectoryStructure.externalFileAttributes >> 16) & S_IFMT
+            // Use truncatingIfNeeded for safer conversion across platforms
+            let modeValue = UInt16(truncatingIfNeeded: self.centralDirectoryStructure.externalFileAttributes >> 16)
+            let mode = mode_t(modeValue) & S_IFMT
             switch mode {
             case S_IFREG:
-                return .file
+                // Some libraries incorrectly mark directories as S_IFREG.
+                // If the path has a trailing "/", it takes precedence over file type flags
+                // and must be treated as a directory.
+                return isDirectory ? .directory : .file
             case S_IFDIR:
                 return .directory
             case S_IFLNK:

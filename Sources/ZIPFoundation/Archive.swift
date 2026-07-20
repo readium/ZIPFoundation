@@ -2,13 +2,16 @@
 //  Archive.swift
 //  ZIPFoundation
 //
-//  Copyright © 2017-2024 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
+//  Copyright © 2017-2026 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
 //  Released under the MIT License.
 //
 //  See https://github.com/weichsel/ZIPFoundation/blob/master/LICENSE for license information.
 //
 
 import Foundation
+#if canImport(Android)
+import Android
+#endif
 
 /// The default chunk size when reading entry data from an archive.
 public let defaultReadChunkSize = Int(16*1024)
@@ -107,6 +110,9 @@ public actor Archive {
         case read
         /// Indicates that a newly instantiated `Archive` should update an existing backing file.
         case update
+
+        /// Indicates that the archive can be written to.
+        var isWritable: Bool { self != .read }
     }
 
     /// The version of an `Archive`
@@ -115,6 +121,11 @@ public actor Archive {
         case v20 = 20
         /// The minimum version for archives making use of ZIP64 extensions
         case v45 = 45
+    }
+
+    enum ExtraFieldHeaderID: UInt16 {
+        case zip64ExtendedInformation = 0x0001
+        case infoZIPUnicodePath = 0x7075
     }
 
     struct EndOfCentralDirectoryRecord: DataSerializable {

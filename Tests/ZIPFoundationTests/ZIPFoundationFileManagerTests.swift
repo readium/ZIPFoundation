@@ -2,7 +2,7 @@
 //  ZIPFoundationFileManagerTests.swift
 //  ZIPFoundation
 //
-//  Copyright © 2017-2024 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
+//  Copyright © 2017-2026 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
 //  Released under the MIT License.
 //
 //  See https://github.com/weichsel/ZIPFoundation/blob/master/LICENSE for license information.
@@ -158,7 +158,7 @@ extension ZIPFoundationTests {
         let linkArchive = try XCTUnwrap(maybeArchive)
         try? await linkArchive.addEntry(with: "link", type: .symlink, uncompressedSize: Int64(4),
                                   provider: { (_, _) -> Data in
-            return linkTarget.data(using: .utf8) ?? Data()
+            return Data(linkTarget.utf8)
         })
         try? await fileManager.unzipItem(at: linkArchiveURL, to: destinationURL, allowUncontainedSymlinks: true)
         XCTAssert(fileManager.itemExists(at: destinationURL.appendingPathComponent("link")))

@@ -2,13 +2,16 @@
 //  FileManager+ZIP.swift
 //  ZIPFoundation
 //
-//  Copyright © 2017-2024 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
+//  Copyright © 2017-2026 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
 //  Released under the MIT License.
 //
 //  See https://github.com/weichsel/ZIPFoundation/blob/master/LICENSE for license information.
 //
 
 import Foundation
+#if canImport(Android)
+import Android
+#endif
 
 extension FileManager {
 
@@ -87,7 +90,8 @@ extension FileManager {
     ///   - sourceURL: The file URL pointing to an existing ZIP file.
     ///   - destinationURL: The file URL that identifies the destination directory of the unzip operation.
     ///   - skipCRC32: Optional flag to skip calculation of the CRC32 checksum to improve performance.
-    ///   - allowUncontainedSymlinks: Optional flag to allow symlinks that point to paths outside the destination.
+    ///   - symlinksValidWithin: Any symlink target that resolves outside this URL is rejected for security reasons.
+    ///                          Pass `.rootFS` to allow symlinks to point anywhere on the filesystem.
     ///   - progress: A progress object that can be used to track or cancel the unzip operation.
     ///   - pathEncoding: Encoding for entry paths. Overrides the encoding specified in the archive.
     /// - Throws: Throws an error if the source item does not exist or the destination URL is not writable.
@@ -100,6 +104,7 @@ extension FileManager {
         }
         let archive = try await Archive(url: sourceURL, accessMode: .read, pathEncoding: pathEncoding)
         var totalUnitCount = Int64(0)
+        let symlinksValidWithin = symlinksValidWithin ?? destinationURL
         if let progress = progress {
             totalUnitCount = try await archive.entries().reduce(0, { $0 + archive.totalUnitCountForReading($1) })
             progress.totalUnitCount = totalUnitCount
@@ -182,14 +187,33 @@ extension FileManager {
         }
 
         try self.setSymlinkModificationDate(modificationDate, ofItemAtURL: url)
+#elseif os(Linux)
+        // Permission bits on symlinks are ignored by the Linux kernel, so the
+        // archive's stored permissions for symlinks have nothing to attach to
+        // — `lchmod` is effectively a no-op even when Glibc exposes it. The
+        // modification date *is* respected though: `lutimes` writes to the
+        // symlink itself rather than its target, and Glibc has shipped it
+        // since 2.6. swift-corelibs-foundation's `setAttributes` doesn't
+        // round-trip `.modificationDate` for symlinks today, so we go
+        // straight to the libc syscall here to preserve mtime parity with
+        // Apple platforms when extracting.
+        guard let modificationDate = attributes[.modificationDate] as? Date else {
+            throw Entry.EntryError.missingModificationDateAttributeError
+        }
+
+        try self.setSymlinkModificationDate(modificationDate, ofItemAtURL: url)
 #else
-        // Since non-Darwin POSIX platforms ignore permissions on symlinks and swift-corelibs-foundation
-        // currently doesn't support setting the modification date, this codepath is currently a no-op
-        // on these platforms.
+        // Some platforms lack a fully equivalent symlink-targeted
+        // `lutimes`; leave this codepath as a no-op there.
         return
 #endif
     }
 
+#if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
+    // `lchmod` and `lutimes` are Apple-only (Glibc gained `lchmod` in 2.32 but
+    // the Linux kernel ignores permission bits on symlinks; the Swift Android
+    // SDK ships neither). Match the Apple-gated call sites above and only
+    // define the helpers where they're usable.
     func setSymlinkPermissions(_ posixPermissions: NSNumber, ofItemAtURL url: URL) throws {
         let fileSystemRepresentation = self.fileSystemRepresentation(withPath: url.path)
         let modeT = posixPermissions.uint16Value
@@ -197,7 +221,9 @@ extension FileManager {
             throw POSIXError(errno, path: url.path)
         }
     }
+#endif
 
+#if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS) || os(Linux)
     func setSymlinkModificationDate(_ modificationDate: Date, ofItemAtURL url: URL) throws {
         let fileSystemRepresentation = self.fileSystemRepresentation(withPath: url.path)
         var fileStat = stat()
@@ -216,6 +242,7 @@ extension FileManager {
             }
         }
     }
+#endif
 
     class func attributes(from entry: Entry) -> [FileAttributeKey: Any] {
         let centralDirectoryStructure = entry.centralDirectoryStructure
@@ -224,10 +251,7 @@ extension FileManager {
         let fileDate = centralDirectoryStructure.lastModFileDate
         let defaultPermissions = entryType == .directory ? defaultDirectoryPermissions : defaultFilePermissions
         var attributes = [.posixPermissions: defaultPermissions] as [FileAttributeKey: Any]
-        // Certain keys are not yet supported in swift-corelibs
-#if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
         attributes[.modificationDate] = Date(dateTime: (fileDate, fileTime))
-#endif
         let versionMadeBy = centralDirectoryStructure.versionMadeBy
         guard let osType = Entry.OSType(rawValue: UInt(versionMadeBy >> 8)) else { return attributes }
 
@@ -264,6 +288,7 @@ extension FileManager {
         return externalFileAttributes
     }
 
+#if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS) || os(Linux) || os(Android)
     class func permissionsForItem(at URL: URL) throws -> UInt16 {
         let fileManager = FileManager()
         let entryFileSystemRepresentation = fileManager.fileSystemRepresentation(withPath: URL.path)
@@ -297,14 +322,14 @@ extension FileManager {
         guard fileManager.itemExists(at: url) else {
             throw CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: url.path])
         }
+
         let entryFileSystemRepresentation = fileManager.fileSystemRepresentation(withPath: url.path)
-        var fileStat = stat()
-        lstat(entryFileSystemRepresentation, &fileStat)
-        guard fileStat.st_size >= 0 else {
-            throw CocoaError(.fileReadTooLarge, userInfo: [NSFilePathErrorKey: url.path])
-        }
+        var stats = stat()
+        lstat(entryFileSystemRepresentation, &stats)
+        guard stats.st_size >= 0 else { throw CocoaError(.fileReadTooLarge, userInfo: [NSFilePathErrorKey: url.path]) }
+
         // `st_size` is a signed int value
-        return Int64(fileStat.st_size)
+        return Int64(stats.st_size)
     }
 
     class func typeForItem(at url: URL) throws -> Entry.EntryType {
@@ -317,60 +342,52 @@ extension FileManager {
         lstat(entryFileSystemRepresentation, &fileStat)
         return Entry.EntryType(mode: mode_t(fileStat.st_mode))
     }
-}
+#elseif os(Windows)
+    // Windows has no `lstat`, and reparse-point detection isn't worth the
+    // Win32 dance for our archive use case. Permissions fall back to the
+    // module defaults, mod-times come from `attributesOfItem` (no nanosecond
+    // precision — fine for ZIP's two-second-granular MS-DOS time format),
+    // and symlinks are reported as `.file`.
 
-extension POSIXError {
-
-    init(_ code: Int32, path: String) {
-        let errorCode = POSIXError.Code(rawValue: code) ?? .EPERM
-        self = .init(errorCode, userInfo: [NSFilePathErrorKey: path])
+    class func permissionsForItem(at URL: URL) throws -> UInt16 {
+        let fileManager = FileManager()
+        var isDir: ObjCBool = false
+        _ = fileManager.fileExists(atPath: URL.path, isDirectory: &isDir)
+        return isDir.boolValue ? defaultDirectoryPermissions : defaultFilePermissions
     }
-}
 
-extension CocoaError {
-
-#if swift(>=4.2)
-#else
-
-#if os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS)
-#else
-
-    // The swift-corelibs-foundation version of NSError.swift was missing a convenience method to create
-    // error objects from error codes. (https://github.com/apple/swift-corelibs-foundation/pull/1420)
-    // We have to provide an implementation for non-Darwin platforms using Swift versions < 4.2.
-
-    public static func error(_ code: CocoaError.Code, userInfo: [AnyHashable: Any]? = nil, url: URL? = nil) -> Error {
-        var info: [String: Any] = userInfo as? [String: Any] ?? [:]
-        if let url = url {
-            info[NSURLErrorKey] = url
+    class func fileModificationDateTimeForItem(at url: URL) throws -> Date {
+        let fileManager = FileManager()
+        guard fileManager.itemExists(at: url) else {
+            throw CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: url.path])
         }
-        return NSError(domain: NSCocoaErrorDomain, code: code.rawValue, userInfo: info)
+        let attrs = try fileManager.attributesOfItem(atPath: url.path)
+        return (attrs[.modificationDate] as? Date) ?? Date()
     }
 
-#endif
-#endif
-}
-
-public extension URL {
-
-    func isContained(in parentDirectoryURL: URL) -> Bool {
-        // Ensure this URL is contained in the passed in URL
-        let parentDirectoryURL = URL(fileURLWithPath: parentDirectoryURL.path, isDirectory: true).standardized
-        // Maliciously crafted ZIP files can contain entries using a prepended path delimiter `/` in combination
-        // with the parent directory shorthand `..` to bypass our containment check.
-        // When a malicious entry path like e.g. `/../secret.txt` gets appended to the destination 
-        // directory URL (e.g. `file:///tmp/`), the resulting URL `file:///tmp//../secret.txt` gets expanded
-        // to `file:///tmp/secret` when using `URL.standardized`. This URL would pass the check performed
-        // in `isContained(in:)`.
-        // Lower level API like POSIX `fopen` - which is used at a later point during extraction - expands
-        // `/tmp//../secret.txt` to `/secret.txt` though. This would lead to an escape to the parent directory.
-        // To avoid that, we replicate the behavior of `fopen`s path expansion and replace all double delimiters
-        // with single delimiters.
-        // More details: https://github.com/weichsel/ZIPFoundation/issues/281
-        let sanitizedEntryPathURL: URL = {
-            let sanitizedPath = self.path.replacingOccurrences(of: "//", with: "/")
-            return URL(fileURLWithPath: sanitizedPath)
-        }()
-        return sanitizedEntryPathURL.standardized.absoluteString.hasPrefix(parentDirectoryURL.absoluteString)
+    class func fileSizeForItem(at url: URL) throws -> Int64 {
+        let fileManager = FileManager()
+        guard fileManager.itemExists(at: url) else {
+            throw CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: url.path])
+        }
+        var isDir: ObjCBool = false
+        _ = fileManager.fileExists(atPath: url.path, isDirectory: &isDir)
+        if isDir.boolValue { return 0 }
+        let attrs = try fileManager.attributesOfItem(atPath: url.path)
+        guard let size = attrs[.size] as? NSNumber else {
+            throw CocoaError(.fileReadUnknown, userInfo: [NSFilePathErrorKey: url.path])
+        }
+        return size.int64Value
     }
+
+    class func typeForItem(at url: URL) throws -> Entry.EntryType {
+        let fileManager = FileManager()
+        guard url.isFileURL, fileManager.itemExists(at: url) else {
+            throw CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: url.path])
+        }
+        var isDir: ObjCBool = false
+        _ = fileManager.fileExists(atPath: url.path, isDirectory: &isDir)
+        return isDir.boolValue ? .directory : .file
+    }
+#endif
 }

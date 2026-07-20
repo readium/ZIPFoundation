@@ -2,7 +2,7 @@
 //  Entry+ZIP64.swift
 //  ZIPFoundation
 //
-//  Copyright © 2017-2024 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
+//  Copyright © 2017-2026 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
 //  Released under the MIT License.
 //
 //  See https://github.com/weichsel/ZIPFoundation/blob/master/LICENSE for license information.
@@ -16,14 +16,14 @@ protocol ExtensibleDataField: Sendable {
 }
 
 extension Entry {
+
     enum EntryError: Error {
-        case invalidDataError
         case missingPermissionsAttributeError
         case missingModificationDateAttributeError
     }
 
     struct ZIP64ExtendedInformation: ExtensibleDataField {
-        let headerID: UInt16 = ExtraFieldHeaderID.zip64ExtendedInformation.rawValue
+        let headerID: UInt16 = Archive.ExtraFieldHeaderID.zip64ExtendedInformation.rawValue
         let dataSize: UInt16
         static let headerSize: UInt16 = 4
         let uncompressedSize: UInt64
@@ -63,6 +63,7 @@ extension Entry.CentralDirectoryStructure {
 }
 
 extension Entry.ZIP64ExtendedInformation {
+
     enum Field {
         case uncompressedSize
         case compressedSize
@@ -105,29 +106,23 @@ extension Entry.ZIP64ExtendedInformation {
     init?(data: Data, fields: [Field]) {
         let headerLength = 4
         guard fields.reduce(0, { $0 + $1.size }) + headerLength == data.count else { return nil }
+
         var readOffset = headerLength
-        func value<T>(of field: Field) throws -> T where T: BinaryInteger {
-            if fields.contains(field) {
-                defer {
-                    readOffset += MemoryLayout<T>.size
-                }
-                guard readOffset + field.size <= data.count else {
-                    throw Entry.EntryError.invalidDataError
-                }
+        func value<T>(of field: Field) -> T where T: BinaryInteger {
+            if fields.contains(field), readOffset + field.size <= data.count {
+                defer { readOffset += MemoryLayout<T>.size }
+
                 return data.scanValue(start: readOffset)
             } else {
                 return 0
             }
         }
-        do {
-            dataSize = data.scanValue(start: 2)
-            uncompressedSize = try value(of: .uncompressedSize)
-            compressedSize = try value(of: .compressedSize)
-            relativeOffsetOfLocalHeader = try value(of: .relativeOffsetOfLocalHeader)
-            diskNumberStart = try value(of: .diskNumberStart)
-        } catch {
-            return nil
-        }
+
+        self.dataSize = data.scanValue(start: 2)
+        self.uncompressedSize = value(of: .uncompressedSize)
+        self.compressedSize = value(of: .compressedSize)
+        self.relativeOffsetOfLocalHeader = value(of: .relativeOffsetOfLocalHeader)
+        self.diskNumberStart = value(of: .diskNumberStart)
     }
 
     init?(zip64ExtendedInformation: Entry.ZIP64ExtendedInformation?, offset: UInt64) {
@@ -157,7 +152,7 @@ extension Entry.ZIP64ExtendedInformation {
             dataSize = data.scanValue(start: offset + 2)
             let nextOffset = offset + headerSize + Int(dataSize)
             guard nextOffset <= extraFieldLength else { return nil }
-            if headerID == ExtraFieldHeaderID.zip64ExtendedInformation.rawValue {
+            if headerID == Archive.ExtraFieldHeaderID.zip64ExtendedInformation.rawValue {
                 return Entry.ZIP64ExtendedInformation(data: data.subdata(in: offset..<nextOffset), fields: fields)
             }
             offset = nextOffset

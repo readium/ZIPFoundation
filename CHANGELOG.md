@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.9.20](https://github.com/weichsel/ZIPFoundation/releases/tag/0.9.20)
+
+### Added
+ - Added support for file modification date attributes on non-Darwin platforms
+ - Added code page 437 string decoding for paths on non-Darwin platforms
+
+### Updated
+ - Fixed resource leak in `Archive.makeBackingConfiguration`
+ - Fixed memory leak in `Data.readChunk`
+ - Fixed memory alignment crash in debug mode
+ - Fixed API type reason ID in privacy manifest
+ - Improved error handling in `MemoryFile` type
+ - Improved `String` to `Data` conversion to use non-optional API
+ - Improved error handling for `ftello` operations
+ - Improved README examples to use non-deprecated API
+ - Improved CI configuration and linting
+
 ## [0.9.19](https://github.com/weichsel/ZIPFoundation/releases/tag/0.9.19)
 
 ### Updated

@@ -22,6 +22,9 @@
 		BA643D7A264811FB00018273 /* URL+ZIP.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA643D79264811FB00018273 /* URL+ZIP.swift */; };
 		BA643D7C2648131C00018273 /* Archive+Progress.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA643D7B2648131C00018273 /* Archive+Progress.swift */; };
 		BA9AFCCA2ABB645F00A1268C /* PrivacyInfo.xcprivacy in CopyFiles */ = {isa = PBXBuildFile; fileRef = BA9AFCC82ABB643E00A1268C /* PrivacyInfo.xcprivacy */; };
+		BAA134902F23E6F800C20E01 /* Error+ZIP.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAA1348F2F23E6F800C20E01 /* Error+ZIP.swift */; };
+		BAA134922F23E7B000C20E01 /* Shims.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAA134912F23E7B000C20E01 /* Shims.swift */; };
+		BAA134942F23F1C200C20E01 /* String+ZIP.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAA134932F23F1C200C20E01 /* String+ZIP.swift */; };
 		BAAF13DA25CC140300070A95 /* ZIPFoundationErrorConditionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAAF13D925CC140300070A95 /* ZIPFoundationErrorConditionTests.swift */; };
 		BACE20B826F7CE6C003BA312 /* Archive+BackingConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BACE20B726F7CE6C003BA312 /* Archive+BackingConfiguration.swift */; };
 		BACE20BA26F7D18A003BA312 /* Archive+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = BACE20B926F7D18A003BA312 /* Archive+Helpers.swift */; };
@@ -85,6 +88,9 @@
 		BA643D79264811FB00018273 /* URL+ZIP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "URL+ZIP.swift"; sourceTree = "<group>"; };
 		BA643D7B2648131C00018273 /* Archive+Progress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Archive+Progress.swift"; sourceTree = "<group>"; };
 		BA9AFCC82ABB643E00A1268C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		BAA1348F2F23E6F800C20E01 /* Error+ZIP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Error+ZIP.swift"; sourceTree = "<group>"; };
+		BAA134912F23E7B000C20E01 /* Shims.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shims.swift"; sourceTree = "<group>"; };
+		BAA134932F23F1C200C20E01 /* String+ZIP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+ZIP.swift"; sourceTree = "<group>"; };
 		BAAF13D925CC140300070A95 /* ZIPFoundationErrorConditionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZIPFoundationErrorConditionTests.swift; sourceTree = "<group>"; };
 		BACE20B726F7CE6C003BA312 /* Archive+BackingConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Archive+BackingConfiguration.swift"; sourceTree = "<group>"; };
 		BACE20B926F7D18A003BA312 /* Archive+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Archive+Helpers.swift"; sourceTree = "<group>"; };
@@ -154,6 +160,7 @@
 				OBJ_18 /* ZIPFoundationDataSerializationTests.swift */,
 				OBJ_19 /* ZIPFoundationEntryTests.swift */,
 				590A7DAD26B0F95E00CBEFB4 /* ZIPFoundationEntryTests+ZIP64.swift */,
+				82BD5DB52F11141E00DA5764 /* ZipFoundationEntryTests+InfoZIP.swift */,
 				BAAF13D925CC140300070A95 /* ZIPFoundationErrorConditionTests.swift */,
 				59248AA126B6EC770078ABDA /* ZIPFoundationErrorConditionTests+ZIP64.swift */,
 				BA0F721F29756590006DD5DB /* ZIPFoundationFileAttributeTests.swift */,
@@ -218,6 +225,8 @@
 				OBJ_14 /* Entry.swift */,
 				BACE20BC26F7D545003BA312 /* Entry+Serialization.swift */,
 				590A7DA726B0F91E00CBEFB4 /* Entry+ZIP64.swift */,
+				82BD5DB32F1112D900DA5764 /* Entry+InfoZIP.swift */,
+				BAA1348F2F23E6F800C20E01 /* Error+ZIP.swift */,
 				OBJ_15 /* FileManager+ZIP.swift */,
 				BA643D79264811FB00018273 /* URL+ZIP.swift */,
 			);
@@ -345,6 +354,7 @@
 			files = (
 				OBJ_48 /* Archive+Reading.swift in Sources */,
 				OBJ_49 /* Archive+Writing.swift in Sources */,
+				82BD5DB42F1112F300DA5764 /* Entry+InfoZIP.swift in Sources */,
 				OBJ_50 /* Archive.swift in Sources */,
 				BACE20B826F7CE6C003BA312 /* Archive+BackingConfiguration.swift in Sources */,
 				OBJ_51 /* Data+Compression.swift in Sources */,
@@ -357,6 +367,8 @@
 				CAD796BF2D5BE0AD0014099B /* SharedMutableValue.swift in Sources */,
 				OBJ_53 /* Entry.swift in Sources */,
 				OBJ_54 /* FileManager+ZIP.swift in Sources */,
+				BAA134922F23E7B000C20E01 /* Shims.swift in Sources */,
+				BAA134942F23F1C200C20E01 /* String+ZIP.swift in Sources */,
 				BA643D7C2648131C00018273 /* Archive+Progress.swift in Sources */,
 				CAF35E502D11A4290042C460 /* FileDataSource.swift in Sources */,
 				CAF35E4D2D1187060042C460 /* DataSource.swift in Sources */,
@@ -520,7 +532,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
-				CURRENT_PROJECT_VERSION = 0.9.19;
+				CURRENT_PROJECT_VERSION = 0.9.20;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				ENABLE_TESTABILITY = YES;
@@ -545,7 +557,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
-				CURRENT_PROJECT_VERSION = 0.9.19;
+				CURRENT_PROJECT_VERSION = 0.9.20;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				ENABLE_TESTABILITY = YES;

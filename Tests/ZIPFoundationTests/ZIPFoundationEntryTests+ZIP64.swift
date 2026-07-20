@@ -2,7 +2,7 @@
 //  ZIPFoundationEntryTests+ZIP64.swift
 //  ZIPFoundation
 //
-//  Copyright © 2017-2024 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
+//  Copyright © 2017-2026 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
 //  Released under the MIT License.
 //
 //  See https://github.com/weichsel/ZIPFoundation/blob/master/LICENSE for license information.
@@ -67,7 +67,7 @@ extension ZIPFoundationTests {
                                      0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
         let zip64DataDescriptor = await Entry.ZIP64DataDescriptor(data: Data(zip64DDBytes),
                                                             additionalDataProvider: {_ -> Data in
-                                                                return Data() })
+            return Data() })
         XCTAssertEqual(zip64DataDescriptor?.uncompressedSize, 10)
         XCTAssertEqual(zip64DataDescriptor?.compressedSize, 10)
     }
@@ -85,13 +85,11 @@ extension ZIPFoundationTests {
                                  0xb0, 0x11, 0x00, 0x00, 0x00, 0x00]
         guard let cds = await Entry.CentralDirectoryStructure(data: Data(cdsBytes),
                                                         additionalDataProvider: { count -> Data in
-                                                            guard let name = "/".data(using: .utf8) else {
-                                                                throw AdditionalDataError.encodingError
-                                                            }
-                                                            let extra = name + Data(extraFieldBytesIncludingSizeFields)
-                                                            XCTAssert(count == extra.count)
-                                                            return extra
-                                                        }) else {
+            let name = Data("/".utf8)
+            let extra = name + Data(extraFieldBytesIncludingSizeFields)
+            XCTAssert(count == extra.count)
+            return extra
+        }) else {
             XCTFail("Failed to read central directory structure."); return
         }
         XCTAssertNotNil(cds.extraFields)

@@ -2,13 +2,16 @@
 //  Archive+Reading.swift
 //  ZIPFoundation
 //
-//  Copyright © 2017-2024 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
+//  Copyright © 2017-2026 Thomas Zoechling, https://www.peakstep.com and the ZIP Foundation project authors.
 //  Released under the MIT License.
 //
 //  See https://github.com/weichsel/ZIPFoundation/blob/master/LICENSE for license information.
 //
 
 import Foundation
+#if canImport(Android)
+import Android
+#endif
 
 extension Archive {
     /// Read a ZIP `Entry` from the receiver and write it to `url`.
@@ -18,12 +21,14 @@ extension Archive {
     ///   - url: The destination file URL.
     ///   - bufferSize: The maximum size of the read buffer and the decompression buffer (if needed).
     ///   - skipCRC32: Optional flag to skip calculation of the CRC32 checksum to improve performance.
-    ///   - allowUncontainedSymlinks: Optional flag to allow symlinks that point to paths outside the destination.
+    ///   - symlinksValidWithin: Any symlink target that resolves outside this URL is rejected for security reasons.
+    ///                          Pass `.rootFS` to allow symlinks to point anywhere on the filesystem.
     ///   - progress: A progress object that can be used to track or cancel the extract operation.
     /// - Returns: The checksum of the processed content or 0 if the `skipCRC32` flag was set to `true`.
     /// - Throws: An error if the destination file cannot be written or the entry contains malformed content.
     public func extract(_ entry: Entry, to url: URL, bufferSize: Int? = nil,
-                        skipCRC32: Bool = false, allowUncontainedSymlinks: Bool = false,
+                        skipCRC32: Bool = false,
+                        symlinksValidWithin: URL? = nil,
                         progress: Progress? = nil) async throws -> CRC32 {
         let bufferSize = bufferSize ?? readChunkSize
         guard bufferSize > 0 else {
@@ -61,7 +66,7 @@ extension Archive {
                 let parentURL = url.deletingLastPathComponent()
                 let isAbsolutePath = (linkPath as NSString).isAbsolutePath
                 let linkURL = URL(fileURLWithPath: linkPath, relativeTo: isAbsolutePath ? nil : parentURL)
-                let isContained = allowUncontainedSymlinks || linkURL.isContained(in: parentURL)
+                let isContained = linkURL.isContained(in: symlinksValidWithin ?? parentURL)
                 guard isContained else { throw ArchiveError.uncontainedSymlink }
 
                 let fileManager = FileManager.default
