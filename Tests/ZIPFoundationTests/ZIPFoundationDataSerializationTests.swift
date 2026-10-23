@@ -112,4 +112,20 @@ extension ZIPFoundationTests {
         await XCTAssertSwiftError(try Data.writeLargeChunk(data, size: 1024, bufferSize: 256, to: file),
                             throws: Data.DataError.unwritableFile)
     }
+
+    func testReadIntFromMisalignedData() async throws {
+        // A slice starting at an odd offset of heap storage is not 4-byte aligned.
+        let storage = Data((0..<32).map { UInt8($0) })
+        let transaction = FixedDataTransaction(data: storage[1..<5])
+        let value = try await transaction.readInt()
+        XCTAssertEqual(value, UInt32(littleEndian: 0x04030201))
+    }
+}
+
+private struct FixedDataTransaction: DataSourceTransaction {
+    let data: Data
+
+    func position() async throws -> UInt64 { 0 }
+    func seek(to position: UInt64) async throws {}
+    func read(length: Int) async throws -> Data { data }
 }
