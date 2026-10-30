@@ -36,7 +36,7 @@ extension Data {
 
     func scanValue<T>(start: Int) -> T {
         let subdata = self.subdata(in: start..<start+MemoryLayout<T>.size)
-        return subdata.withUnsafeBytes { $0.load(as: T.self) }
+        return subdata.withUnsafeBytes { $0.loadUnaligned(as: T.self) }
     }
 
     static func readStruct<T>(from file: FILEPointer, at offset: UInt64) async -> T? where T: DataSerializable {
